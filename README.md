@@ -54,7 +54,12 @@ development environment in an offline virtual machine and will still be able to 
 hardware manufacturer of the main controller board does not exist anymore.  
   
 # Videos
-TODO  
+Download and watch:  
+[Scenario1](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario1.mp4): normal operation  
+[Scenario2](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario2.mp4): seeking  
+[Scenario3](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario3.mp4): sorting  
+[Scenario4](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario4.mp4): auto bookmarks  
+[Scenario5](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario5.mp4): sleep timer  
   
 # Hardware
 The build only needs a few components that are manufactured by others in mass and therefore cheap.  
