@@ -116,6 +116,27 @@ Click on the picture for zoom.
 # UI navigation
 TODO
   
+# Uploading initial binary release
+TODO  
+  
+# FW upgrade using SD card
+TODO
+  
+# Compilation hints
+Currently used espressif sdk versions:  
+esp-idf:  v5.1.1/commit e088c3766ba440e72268b458a68f27b6e7d63986
+esp-adf:  v2.6/commit 49f80aafefc31642ea98db78bf024e18688b8de9
+  
+Needed for exFAT:   
+To enable exFAT file esp-idf/components/fatfs/src/ffconf.h needs to edited and macro FF_FS_EXFAT needs to be set 1.  
+  
+Optionally for more privacy:  
+The esp-adf unnecessarily links the nghttp component which on every compilation checks with the servers for updates.
+To disable delete file idf_components.yml in components/esp-adf-libs/ and change the COMPONENT_REQUIRES in CMakeLists.txt
+so that no nghttp is present anymore. Now complete offline compilation is possible.  
+  
+Take a look into the patches/ directory for more details and .patch files to apply to above sdk versions.
+
 # Limitations/won't do's
 TODO
 
