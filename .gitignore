@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+#code settings
+src/.vscode/
+
+#esp build directory
+src/build/
