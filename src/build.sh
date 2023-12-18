@@ -1,6 +1,7 @@
 #!/bin/sh
 
+export IDF_COMPONENT_MANAGER=0
 export ADF_PATH=/opt/esp-adf
 . ~/esp/esp-idf/export.sh
-idf.py 
-idf.py menuconfig
+idf.py clean
+idf.py build
