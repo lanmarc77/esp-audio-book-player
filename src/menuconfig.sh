@@ -2,5 +2,4 @@
 
 export ADF_PATH=/opt/esp-adf
 . ~/esp/esp-idf/export.sh
-idf.py 
 idf.py menuconfig
