@@ -28,9 +28,9 @@ development board:
 integrated in an old speaker that otherwise might have landed in the trash:  
 ![image](pictures/speaker_integrated.jpg)  
   
-TODO: the portable/smaller version:
+the portable/smaller version:  
 ![image](pictures/mobile_version.jpg)  
-
+  
 [first poc](pictures/first_poc.jpg)
   
 # Why?
@@ -80,7 +80,7 @@ Typical price in Germany incl. tax (2023): 20€.
 **I²S digital analog audio converter**  
 Currently only a MAX98357A based converter has been tested extensively. Also an UDA1334A was tested and it worked.
 The MAX98357A already contains an amplifier to directly connect it to a speaker and get a usable volume out
-of it.
+of it.  
 ![image](pictures/MAX98357A.jpg)  
 Typical price in Germany incl. tax (2023): 8€. 
   
