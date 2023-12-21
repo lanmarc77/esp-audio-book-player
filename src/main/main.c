@@ -40,6 +40,7 @@ void MAIN_deep_sleep(){
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
     ESP_LOGI(MAIN_LOG_TAG,"Pulldown Enable: %i",rtc_gpio_pulldown_en(WAKEUP_PIN));
     ESP_LOGI(MAIN_LOG_TAG,"Wakupeset: %i",esp_sleep_enable_ext1_wakeup(1<<WAKEUP_PIN,ESP_EXT1_WAKEUP_ANY_HIGH)); //1 = High, 0 = Low
+    //esp_sleep_enable_timer_wakeup(1000000*10);
     vTaskDelay(20);
     esp_deep_sleep_start();
 }

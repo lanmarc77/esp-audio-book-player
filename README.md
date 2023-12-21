@@ -6,7 +6,7 @@ A device that is meant to play non-DRM audio books from an SD card and has the f
 - folder based audio book player, one folder contains all files of one audio book
 - multiple audio books supported
 - sorting of audio book names and audio book files by ASCII name (see limitations of sorting below)
-- saves audio book listening position and resumes
+- saves audio book listening position and resumes for each audio book
 - supports huge single file audio books, e.g. a 20hrs long singe file audio book
 - file formats AMR-WB, MP3 and OGG
 - ASCII character based menu driven UI for 16x4 character screen
@@ -15,7 +15,7 @@ A device that is meant to play non-DRM audio books from an SD card and has the f
 - auto power off
 - firmware upgrades from SD card
 - based on pure esp-idf + esp-adf
-- plays 30hrs+ with 2500mAh 18650 battery
+- plays 50hrs+ with 2500mAh 18650 battery
 - endless options of integrations with speakers/cases
   
 It tries to follow the design principle of
@@ -116,6 +116,51 @@ Click on the picture for zoom.
   
 The original .odt file of this drawing is in the `src`directory.  
   
+Pictures of manually wired PCB:  
+![image](pictures/pcb_top.jpg)  
+![image](pictures/pcb_bottom.jpg)  
+  
+These PCBs have headers for the components. You can leave these out but then need to make sure in 
+which order you solder the wires as you might not get to them anymore.   
+  
+## Current measurements / battery life
+The runtime of the system is highly dependent on the current consumption. The current consumption depends on the
+type of audio played and mostly the volume. The following measurements were made using the
+setup prototype development board as seen above with 8 Ohm speaker OWS-131845W50A-8, 3.7V, 4GB class 10 Transcend
+microSD. An UNI-T UT61E 61a with a 22µF tantal smoothing capacitor to handle the current peaks was used.  
+
+  
+| scenario                             | volume setting  | current |
+|--------------------------------------|-----------:|------------:|
+| switched off                         |  0%  | 19µA   |
+| switched on, not playing, display on |  0%  | 37ma   |
+| switched on, not playing, display off|  0%  | 34ma   |
+| 128kbit/s mp3 44100 khz              | 50%  | 42ma   |
+| 64kbit/s mp3 44100 khz               | 50%  | 42ma   |
+| 128kbit/s mp3 22050 khz              | 50%  | 39ma   |
+| 64kbit/s mp3 22050 khz               | 50%  | 39ma   |
+| 128kbit/s ogg 44100 khz              | 50%  | 44ma   |
+| 64kbit/s ogg 44100 khz               | 50%  | 44ma   |
+| 128kbit/s ogg 22050 khz              | 50%  | 41ma   |
+| 64kbit/s ogg 22050 khz               | 50%  | 41ma   |
+| 24kbit/s amr 16000 khz               | 50%  | 41ma   |
+| 128kbit/s mp3 44100 khz              | 75%  | 51ma   |
+| 64kbit/s mp3 44100 khz               | 75%  | 51ma   |
+| 128kbit/s mp3 22050 khz              | 75%  | 50ma   |
+| 64kbit/s mp3 22050 khz               | 75%  | 50ma   |
+| 128kbit/s ogg 44100 khz              | 75%  | 52ma   |
+| 64kbit/s ogg 44100 khz               | 75%  | 52ma   |
+| 128kbit/s ogg 22050 khz              | 75%  | 52ma   |
+| 64kbit/s ogg 22050 khz               | 75%  | 52ma   |
+| 24kbit/s amr 16000 khz               | 75%  | 52ma   |
+| any file from before                 | 100% | ~105mA |
+  
+At high volumes the energy needed by the speaker dominates the current consumption. Also the current is
+not very stable and highly depends on the content that is actually played.  
+The volume setting actually follows an x⁴ curve for translating % into power to fit our hearing.  
+  
+An 18650 battery with 2500mAh will most likely hold 50hrs assuming average volume levels between 50%...75%.  
+  
 # UI navigation
 TODO
   
@@ -198,9 +243,9 @@ TODO
 - m4b, drm
 - m3u/playlists
 - mp3/ogg chapter support
-- mp3 cbr/vbr
-- charsets other than ascii
-- bluetooth
+- mp3/ogg cbr/vbr
+- file/folder charsets other than ascii
+- bluetooth audio
 - playing speed
 - equalizer
 - upload on SD card not via ESP USB connector
@@ -211,11 +256,11 @@ TODO:
 - On the board the ESP32-S3 and it's alternative options
 - On sorting
 - On bookmark storage and cleanup
-- On battery life
-- On MP3 VBR/CBR
+- On MP3/OGG VBR/CBR
   
 # Ideas/future
 - multi user support
+- wake up timer
 - audio navigation for handicapped people
 - PCB with fitting 3D printable case or fitting for a cheap buyable case
 
