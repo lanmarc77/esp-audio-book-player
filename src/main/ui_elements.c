@@ -68,8 +68,13 @@ void SSD1306_printStr(uint8_t x,uint8_t y, char* string){
     if(UI_ELEMENTS_displayDark==false) for(i=0;string[i]!=0;i++) ssd1306_draw_char(SSD1306_dev, (x+i)*8,y*16, string[i],16,1);
 }
 
-//displays a progress bar based on percent 0...100
-void UI_ELEMENTS_progressBar(uint8_t percent){
+/**
+  * @brief shows the progress meter
+  *
+  * @param percent percent 0...100
+  * 
+  */
+ void UI_ELEMENTS_progressBar(uint8_t percent){
     char progress[17];
     uint8_t i;
     uint8_t numCharsBig=(14*percent)/100;
@@ -89,6 +94,13 @@ void UI_ELEMENTS_progressBar(uint8_t percent){
 }
 
 int32_t UI_ELEMENTS_lastSecondsDisplayed=-1;
+/**
+  * @brief shows a time in hours minutes seconds
+  *
+  * @param playedS time to display in seconds
+  * @param displayMode 0=normal,1=hours+minutes blink,2=playedS is displayed as negative number
+  * 
+  */
 void UI_ELEMENTS_timePlayed(int32_t playedS,uint8_t displayMode){
     char timeString[17];
     if((UI_ELEMENTS_lastSecondsDisplayed>=0)||(UI_ELEMENTS_lastSecondsDisplayed!=playedS)){
@@ -150,6 +162,12 @@ uint8_t UI_ELEMENTS_getPercentFromBattVotage(uint16_t battVoltage){
     return p;
 }
 
+/**
+  * @brief displays a battery level
+  *
+  * @param value battery level in mV
+  * 
+  */
 void UI_ELEMENTS_batteryIndicator(uint32_t value){
     char b[12];
     uint8_t percent=0;
@@ -177,6 +195,12 @@ void UI_ELEMENTS_batteryIndicator(uint32_t value){
     }
 }
 
+/**
+  * @brief displays different type of huge symbols
+  *
+  * @param symbol symbol number to display
+  * 
+  */
 void UI_ELEMENTS_mainSymbol(uint8_t symbol){
     uint64_t now=esp_timer_get_time();
     char b[17];
@@ -249,9 +273,24 @@ void UI_ELEMENTS_mainSymbol(uint8_t symbol){
         SSD1306_printStr(0,1,"    -      -    ");
         SSD1306_printStr(0,2,"    -      -    ");
         SSD1306_printStr(0,3,"       ||       ");
+    }else if(symbol==16){//wakeup timer
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1,"(-_-)  ->  (o_o)");
+        SSD1306_printStr(0,2,"                ");
+        SSD1306_printStr(0,3,"                ");
     }
 }
 
+/**
+  * @brief allows to display a number selection element
+  * 
+  * @param x position on screen
+  * @param y position on screen
+  * @param selectedNumber the currently selected number
+  * @param amountOfNumbers highest number to select
+  * @param blinkMode 0=number is displayed solid, 1=number is blinking
+  *
+  */
 void UI_ELEMENTS_numberSelect(uint8_t x,uint8_t y,uint16_t selectedNumber,uint16_t amountOfNumbers,uint8_t blinkMode){
     char chapterString[17];
     char chapterCompleteString[17];
@@ -269,6 +308,36 @@ void UI_ELEMENTS_numberSelect(uint8_t x,uint8_t y,uint16_t selectedNumber,uint16
     SSD1306_printStr(x,y,&chapterCompleteString[0]);
 }
 
+/**
+  * @brief allows to display a time element in hours and minutes
+  * 
+  * @param x position on screen
+  * @param y position on screen
+  * @param secondsTime the currently selected time
+  * @param blinkMode 0=time is displayed solid, 1=time is blinking
+  *
+  */
+void UI_ELEMENTS_timeSelect(uint8_t x,uint8_t y,uint64_t secondsTime,uint8_t blinkMode){
+    char timeString[17];
+    uint64_t now=esp_timer_get_time();
+    if(blinkMode==1){
+        if(((now/1000)%1000)<100){
+            sprintf(&timeString[0],"  :  ");
+        }else{
+            sprintf(&timeString[0],"%02i:%02i",(uint16_t)(secondsTime/3600),(uint16_t)((secondsTime%3600)/60));
+        }
+    }else{
+        sprintf(&timeString[0],"%02i:%02i",(uint16_t)(secondsTime/3600),(uint16_t)((secondsTime%3600)/60));
+    }
+    SSD1306_printStr(x,y,&timeString[0]);
+}
+
+/**
+  * @brief shows a volume meter full screen
+  * 
+  * @param volume volume level to show 0...10000
+  *
+  */
 void UI_ELEMENTS_volume(int64_t volume){
     char screen[16*4];
     char line[17];
@@ -297,6 +366,15 @@ void UI_ELEMENTS_volume(int64_t volume){
 
 uint16_t UI_ELEMENTS_lastTextScrollyPos=0;
 uint64_t UI_ELEMENTS_lastTextScrollyTimestamp=0;
+/**
+  * @brief resets the textScrolly state machine so that the next call
+  *        is handled as it would be the first (beginning of text visible)
+  * 
+  * @param x position on screen
+  * @param y position on screen
+  * @param length the reserved maximum available length in chars on the display to scroll within
+  *
+  */
 void UI_ELEMENTS_textScrollyReset(uint8_t x,uint8_t y, uint8_t length){
     char scrollyText[17];
     uint8_t i;
@@ -309,6 +387,16 @@ void UI_ELEMENTS_textScrollyReset(uint8_t x,uint8_t y, uint8_t length){
     SSD1306_printStr(x,y,&scrollyText[0]);
 }
 
+/**
+  * @brief implements a general text scrolly that only scrolls if needed
+  *        and can therefore also be used as simple text output
+  *
+  * @param x position on screen
+  * @param y position on screen
+  * @param length the reserved maximum available length in chars on the display to scroll within
+  * @param string pointer to the text to display
+  * 
+  */
 void UI_ELEMENTS_textScrolly(uint8_t x,uint8_t y, uint8_t length, char *string){
     char scrollyText[17];
     uint8_t sl=strlen(string);
@@ -340,6 +428,13 @@ void UI_ELEMENTS_textScrolly(uint8_t x,uint8_t y, uint8_t length, char *string){
     SSD1306_printStr(x,y,&scrollyText[0]);
 }
 
+/**
+  * @brief displays a countdown time in hours or minutes or seconds as two digit number
+  *        in 3 char wide frame
+  *
+  * @param secondsLeft countdown in seconds
+  * 
+  */
 void UI_ELEMENTS_sleepTimeLeft(uint32_t secondsLeft){
     char timeString[12];
     if(secondsLeft==0){
@@ -357,6 +452,11 @@ void UI_ELEMENTS_sleepTimeLeft(uint32_t secondsLeft){
 
 }
 
+/**
+  * @brief updates the screen from the internal buffer
+  *        clears the screen if the display should be off
+  *
+  */
 void UI_ELEMENTS_update(){
     if(UI_ELEMENTS_displayDark==false){
         ssd1306_refresh_gram(SSD1306_dev);
@@ -365,23 +465,45 @@ void UI_ELEMENTS_update(){
     } 
 }
 
+/**
+  * @brief clears the screen, works instantly
+  *
+  */
 void UI_ELEMENTS_cls(){
     ssd1306_clear_screen(SSD1306_dev, 0x00);
 }
 
+/**
+  * @brief switches the display on by internally enabling the update function
+  *
+  */
 void UI_ELEMENTS_displayOn(){
     UI_ELEMENTS_displayDark=false;
 }
 
+/**
+  * @brief checks if the display is off by internally disabled update function
+  *
+  * @return true=display is off, false=display is on and being updated
+  */
 bool UI_ELEMENTS_isDisplayOff(){
     return UI_ELEMENTS_displayDark;
 }
 
+/**
+  * @brief switches the display off by internally disabling the update function
+  *        also clears the screen instantly
+  *
+  */
 void UI_ELEMENTS_displayOff(){
     UI_ELEMENTS_displayDark=true;
     SSD1306_cls();
 }
 
+/**
+  * @brief initializes the physical display and clears it
+  *
+  */
 void UI_ELEMENTS_init(){
     SSD1306_init();
     SSD1306_cls();

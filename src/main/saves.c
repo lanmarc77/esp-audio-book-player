@@ -25,15 +25,24 @@
 
 esp_vfs_spiffs_conf_t SAVES_spiffsConf;
 
+/**
+  * @brief  umounts the vfs spiffs partition
+  */
 void SAVES_deInit(){
     esp_vfs_spiffs_unregister(SAVES_spiffsConf.partition_label);
 }
 
+/**
+  * @brief  formats the SPIFFS partition, no questions asked
+  */
 void SAVES_spiffsFormat(){
     esp_spiffs_format(NULL);
 }
 
-void SAVES_init(){
+/**
+  * @brief  mounts the vfs spiffs partition and formats it if needed
+  */
+ void SAVES_init(){
 
     ESP_LOGI(SAVES_LOG_TAG, "Initializing SPIFFS");
 
@@ -80,6 +89,13 @@ void SAVES_init(){
     }
 }
 
+/**
+  * @brief  loads the stored player settings
+  *
+  * @param[out] settings pointer to player settings structure where the loaded settings will be stored
+  * 
+  * @return 0=ok, settings loaded, 1=error, no settings loaded
+  */
 uint8_t SAVES_loadSettings(SAVES_settings_t *settings){
     FILE* f = fopen("/s/settings.cfg", "rb");
     if (f == NULL) {
@@ -96,6 +112,13 @@ uint8_t SAVES_loadSettings(SAVES_settings_t *settings){
     return 1;
 }
 
+/**
+  * @brief  saves the current player settings
+  *
+  * @param[in] settings pointer to player settings structure with filled player settings
+  * 
+  * @return 0=ok, settings stored, 1=error, settings not stored
+  */
 uint8_t SAVES_saveSettings(SAVES_settings_t *settings){
     FILE* f = fopen("/s/settings.cfg", "wb");
     settings->version=0;
@@ -114,6 +137,13 @@ uint8_t SAVES_saveSettings(SAVES_settings_t *settings){
     return 1;
 }
 
+/**
+  * @brief returns a bookmarkFileName=bookmarkID from a audio book folderName
+  *
+  * @param[in] folderName pointer to an audio book folderName
+  * @param[out] saveFileName pointer to string of the name of the bookmark file in SPIFFS
+  * 
+  */
 void SAVES_getBookmarkFileFromFolderName(char* folderName,char* saveFileName){
     mbedtls_md5_context md5Ctx;
     unsigned char md5Hash[16];
@@ -127,6 +157,14 @@ void SAVES_getBookmarkFileFromFolderName(char* folderName,char* saveFileName){
     sprintf(saveFileName,"/s/%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X.b",md5Hash[0],md5Hash[1],md5Hash[2],md5Hash[3],md5Hash[4],md5Hash[5],md5Hash[6],md5Hash[7],md5Hash[8],md5Hash[9],md5Hash[10],md5Hash[11],md5Hash[12],md5Hash[13],md5Hash[14],md5Hash[15]);
 }
 
+/**
+  * @brief checks if bookmark exists for a specific audio book by folderName and if so loads the bookmark
+  *
+  * @param[in] folderName pointer to an audio book folderName
+  * @param[out] save pointer to bookmark structure where the bookmark data will be stored
+  * 
+  * @return 0=ok, bookmark exists and loaded, 1=error, bookmark does not exist
+  */
 uint8_t SAVES_existsBookmark(char* folderName,SAVES_saveState_t* save){
     char saveFileName[64];
     SAVES_getBookmarkFileFromFolderName(folderName,&saveFileName[0]);
@@ -147,6 +185,14 @@ uint8_t SAVES_existsBookmark(char* folderName,SAVES_saveState_t* save){
     return 1;
 }
 
+/**
+  * @brief saves a bookmark exists for a specific audio book specified by folderName
+  *
+  * @param[in] folderName pointer to an audio book folderName
+  * @param[out] save pointer to filled bookmark structure
+  * 
+  * @return 0=ok, bookmark stored, 1=error, bookmark not stored
+  */
 uint8_t SAVES_saveBookmark(char* folderName,SAVES_saveState_t* save){
     char saveFileName[64];
     SAVES_getBookmarkFileFromFolderName(folderName,&saveFileName[0]);
@@ -170,7 +216,10 @@ uint8_t SAVES_saveBookmark(char* folderName,SAVES_saveState_t* save){
     return 1;
 }
 
-//deletes bookmarks from the spiffs which folders+files do not exist on the sd card (anymore)
+/**
+  * @brief deletes bookmarks from the spiffs which folders+files do not exist on the sd card (anymore)
+  *
+  */
 void SAVES_cleanOldBookmarks(){
     char fullfile[FF_FILE_PATH_MAX];
     char fullfile2[FF_FILE_PATH_MAX];

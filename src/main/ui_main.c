@@ -28,6 +28,8 @@
 #include "screens.h"
 #include "format_helper.h"
 #include "battery.h"
+#include "soc/rtc.h"
+#include "esp32s3/rom/rtc.h"
 
 int64_t UI_MAIN_volume=5000;
 #define UI_MAIN_LOG_TAG "UI_MAIN"
@@ -60,6 +62,26 @@ char UI_MAIN_selectedFileName[FF_FILE_PATH_MAX];
 uint16_t UI_MAIN_sortedFileIDs[FF_MAX_SORT_ELEMENTS];
 QueueHandle_t UI_MAIN_rotaryEventQueue;
 
+void UI_MAIN_cpuFull(){
+    rtc_cpu_freq_config_t conf, cconf;
+    rtc_clk_cpu_freq_get_config(&cconf);
+    if(!rtc_clk_cpu_freq_mhz_to_config(240, &conf)){
+        ESP_LOGE(UI_MAIN_LOG_TAG,"CPU clock could not be set to %u MHz", 240);
+    }else{
+        rtc_clk_cpu_freq_set_config_fast(&conf);
+    }
+}
+
+void UI_MAIN_cpuNormal(){
+    rtc_cpu_freq_config_t conf, cconf;
+    rtc_clk_cpu_freq_get_config(&cconf);
+    if(!rtc_clk_cpu_freq_mhz_to_config(80, &conf)){
+        ESP_LOGE(UI_MAIN_LOG_TAG,"CPU clock could not be set to %u MHz", 80);
+    }else{
+        rtc_clk_cpu_freq_set_config_fast(&conf);
+    }
+}
+
 uint8_t UI_MAIN_doubleClick=0;
 void UI_MAIN_rotaryTask(void *parm){
     rotary_encoder_set_queue(&UI_MAIN_rotaryCfg, UI_MAIN_rotaryEventQueue);
@@ -70,14 +92,15 @@ void UI_MAIN_rotaryTask(void *parm){
         memset(&keyMessage,0,sizeof(UI_MAIN_keyMessages_t));
         if (xQueueReceive(UI_MAIN_rotaryEventQueue, &rotaryEvent, pdMS_TO_TICKS(500)) == pdTRUE)
         {
-            //ESP_LOGI(UI_MAIN_LOG_TAG, "Event: position %lu, direction %s", rotaryEvent.state.position,
-            //         rotaryEvent.state.direction ? (rotaryEvent.state.direction == ROTARY_ENCODER_DIRECTION_CLOCKWISE ? "CW" : "CCW") : "NOT_SET");
             uint64_t now=esp_timer_get_time();
             if(rotaryEvent.state.direction == ROTARY_ENCODER_DIRECTION_CLOCKWISE){
                 keyMessage.keyEvent=UI_MAIN_KEY_PLUS;
+                //ESP_LOGI(UI_MAIN_LOG_TAG, "KEY PLUS");
             }else if(rotaryEvent.state.direction == ROTARY_ENCODER_DIRECTION_COUNTER_CLOCKWISE){
                 keyMessage.keyEvent=UI_MAIN_KEY_MINUS;
+                //ESP_LOGI(UI_MAIN_LOG_TAG, "KEY MINUS");
             }else if(rotaryEvent.state.direction == ROTARY_ENCODER_SWITCH){
+                //ESP_LOGI(UI_MAIN_LOG_TAG, "KEY SWITCH");
                 if(rotaryEvent.state.switch_state==ROTARY_ENCODER_SWITCH_SHORT_CLICK){
                     keyMessage.keyEvent=UI_MAIN_KEY_SHORT_CLICK_DELAYED_STAGE;
                     if(UI_MAIN_doubleClick){
@@ -95,6 +118,7 @@ void UI_MAIN_rotaryTask(void *parm){
             UI_MAIN_offTimestamp=now;
             lastTime=now;
             if((!UI_ELEMENTS_isDisplayOff())||(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK)){//send the key only, if display is on with double click exception
+                //ESP_LOGI(UI_MAIN_LOG_TAG, "INQUEUE1: %i",keyMessage.keyEvent);
                 if(xQueueSend(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(100))!=pdPASS){
                     ESP_LOGE(UI_MAIN_LOG_TAG,"Lost keystroke.");
                 }
@@ -107,6 +131,7 @@ void UI_MAIN_rotaryTask(void *parm){
                 keyMessage.keyEvent=UI_MAIN_KEY_SHORT_CLICK;
                 //ESP_LOGI(UI_MAIN_LOG_TAG,"SHORT CLICK");
                 if(!UI_ELEMENTS_isDisplayOff()){//send the key only, if display is on
+                    //ESP_LOGI(UI_MAIN_LOG_TAG, "INQUEUE2: %i",keyMessage.keyEvent);
                     if(xQueueSend(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(100))!=pdPASS){
                         ESP_LOGE(UI_MAIN_LOG_TAG,"Lost keystroke.");
                     }
@@ -122,6 +147,10 @@ void UI_MAIN_rotaryTask(void *parm){
     }
 }
 
+/**
+  * @brief deinitializes the main player and most of the sub components for power off
+  *
+  */
 void UI_MAIN_deInit(){
     // All done, unmount partition and disable SPIFFS
     SAVES_deInit();
@@ -136,12 +165,16 @@ char* UI_MAIN_searchString=NULL;
 int32_t* UI_MAIN_searchId=NULL;
 uint8_t* UI_MAIN_searchFlags=NULL;
 void UI_MAIN_scanSortTaskAllBooks(){
+    UI_MAIN_cpuFull();
     FF_getList(SD_CARD_MOUNT_POINT,&UI_MAIN_amountOfBooks,&UI_MAIN_sortedBookIDs[0],0,&UI_MAIN_scanQueueOut,&UI_MAIN_scanQueueIn,UI_MAIN_searchString,UI_MAIN_searchId,UI_MAIN_searchFlags);
+    UI_MAIN_cpuNormal();
     vTaskDelete(NULL);
 }
 
 void UI_MAIN_scanSortTaskOneBook(){
+    UI_MAIN_cpuFull();
     FF_getList(&UI_MAIN_folderPath[0],&UI_MAIN_amountOfFiles,&UI_MAIN_sortedFileIDs[0],1,&UI_MAIN_scanQueueOut,&UI_MAIN_scanQueueIn,UI_MAIN_searchString,UI_MAIN_searchId,UI_MAIN_searchFlags);
+    UI_MAIN_cpuNormal();
     vTaskDelete(NULL);
 }
 
@@ -160,11 +193,33 @@ uint32_t UI_MAIN_timeDiffNowS(uint64_t timeStamp){
     return 0;
 }
 
+uint64_t UI_MAIN_wakeupTimer=0;
+void UI_MAIN_setWakeupTimer(uint64_t timer){
+    UI_MAIN_wakeupTimer=timer;
+}
+
+/**
+  * @brief returns the setup wakeup timer in seconds for settings the RTC wake up time
+  *
+  * @return wake up time in seconds
+  * 
+  */
+ uint64_t UI_MAIN_getWakeupTimer(){
+    return UI_MAIN_wakeupTimer;
+}
+
 #define UI_MAIN_DEFAULT_SLEEP_TIME_S 300
 SAVES_saveState_t UI_MAIN_saveState;
 SAVES_settings_t UI_MAIN_settings;
 char UI_MAIN_pcWriteBuffer[2048];
-void UI_MAIN_run(){
+
+/**
+  * @brief the main player state machine that only exits if the player should shut down
+  *
+  * @param startUpFlags flags that explain the type of power up (e.g. watchdog or manual)
+  * 
+  */
+ void UI_MAIN_run(uint8_t startUpFlags){
     uint8_t mainSM=0;
     uint8_t pauseMode=0;
     uint16_t selectedFolder=0;
@@ -183,10 +238,11 @@ void UI_MAIN_run(){
     uint64_t currentPlayBitrate=0;
     int32_t currentPlayChannels=0;
     uint64_t lastSdPlayMessage=0;
-    uint64_t lastVolumeChangedTime=esp_timer_get_time();
-    uint64_t lastMinuteChangedTime=esp_timer_get_time();
+    uint64_t lastVolumeChangedTime=esp_timer_get_time()-5*1000000;
+    uint64_t lastMinuteChangedTime=esp_timer_get_time()-5*1000000;
     uint64_t sleepTimeOffTime=0;//the timestamp when the currently setup sleeptime is reached
     uint32_t sleepTimeSetupS=UI_MAIN_DEFAULT_SLEEP_TIME_S;//the setup sleeptime
+    uint64_t wakeupTimeSetupS=3600;
     uint16_t newPlayMinute=0;
     uint64_t newPlayPosition=0;
     uint8_t saveFlag=0;
@@ -203,6 +259,7 @@ void UI_MAIN_run(){
     uint8_t skipped=0;
     memset(&UI_MAIN_saveState,0,sizeof(SAVES_saveState_t));
     memset(&UI_MAIN_settings,0,sizeof(SAVES_settings_t));
+    memset(&keyMessage,0,sizeof(UI_MAIN_keyMessages_t));
     xQueueReset(UI_MAIN_keyQueue);
     playerQueue=SD_PLAY_getMessageQueue();
     while(1){
@@ -310,7 +367,7 @@ void UI_MAIN_run(){
                     if(FF_getNameByID(SD_CARD_MOUNT_POINT,UI_MAIN_sortedBookIDs[selectedFolder-1],&UI_MAIN_selectedFolderName[0],0)!=0){
                         mainSM=0;
                     }
-                    SCREENS_folderSelect(selectedFolder,UI_MAIN_amountOfBooks,&UI_MAIN_selectedFolderName[0]);
+                    SCREENS_folderSelect(selectedFolder,UI_MAIN_amountOfBooks,&UI_MAIN_selectedFolderName[0],UI_MAIN_getWakeupTimer());
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(20)) == pdPASS ){//wait for incoming key messages
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(selectedFolder>1){
@@ -340,6 +397,8 @@ void UI_MAIN_run(){
 
                             xTaskCreate(UI_MAIN_scanSortTaskOneBook, "UI_MAIN_scanSortTaskOneBook", 1024 * 5, NULL,  uxTaskPriorityGet(NULL), NULL);
                             mainSM=15;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            mainSM=12;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){//TODO: go to a settings screen/setup, switch off for now
                             SCREENS_switchingOff();
                             if(UI_MAIN_isImagePersisted()==0){
@@ -350,6 +409,45 @@ void UI_MAIN_run(){
                         }
                     }
                     break;
+            case 12: //wakeup timer selection screen
+                    SCREENS_wakeupTimer(wakeupTimeSetupS);
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            if((now-lastMinuteChangedTime)>50000){
+                                if(wakeupTimeSetupS>60){
+                                    wakeupTimeSetupS-=60;
+                                }else{
+                                    wakeupTimeSetupS=60;
+                                }
+                            }else{
+                                if(wakeupTimeSetupS>60*5){
+                                    wakeupTimeSetupS-=60*5;
+                                }else{
+                                    wakeupTimeSetupS=60;
+                                }
+                            }
+                            if(wakeupTimeSetupS<60) wakeupTimeSetupS=60;
+                            lastMinuteChangedTime=now;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            if((now-lastMinuteChangedTime)>50000){
+                                wakeupTimeSetupS+=60;
+                            }else{
+                                wakeupTimeSetupS+=60*5;
+                            }
+                            if(wakeupTimeSetupS>3600*24) wakeupTimeSetupS=3600*24;
+                            lastMinuteChangedTime=now;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            UI_MAIN_setWakeupTimer(wakeupTimeSetupS);
+                            mainSM=10;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setWakeupTimer(0);
+                            mainSM=10;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setWakeupTimer(0);
+                            mainSM=10;
+                        }
+                    }
+                    break;                    
             case 15:
                     if(xQueueReceive(UI_MAIN_scanQueueOut,&scanMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming scan messages
                         if(scanMessage==-1){//finished ok
@@ -414,8 +512,9 @@ void UI_MAIN_run(){
                         FORMAT_HELPER_getPlayTimeByExtension((uint8_t*)&dummy,(uint16_t*)&dummy,&percent,&UI_MAIN_selectedFileName[0],newPlayPosition,currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,&allPlaySecond,&allPlayMinute,currentPlayChannels);
                         SCREENS_pause1(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],newPlayMinute,currentPlaySecond,percent,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
                     }
-                    if(searchFlags&FF_AUTOSTART_FLAG){
+                    if((searchFlags&FF_AUTOSTART_FLAG)||(startUpFlags&UI_MAIN_STARTUPFLAG_RTC)){
                         searchFlags&=~FF_AUTOSTART_FLAG;//autostart only once for an enterd folder
+                        startUpFlags&=~UI_MAIN_STARTUPFLAG_RTC;
                         mainSM=24;
                     }
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
@@ -639,6 +738,9 @@ void UI_MAIN_run(){
                         }
 
                     }while(rx!=NULL);
+                    if((UI_MAIN_timeDiffNowS(sleepTimeOffTime)>0)&&(UI_MAIN_timeDiffNowS(sleepTimeOffTime)<=10)){//volume fade out if sleep timer nears end
+                        SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume-(UI_MAIN_volume/UI_MAIN_timeDiffNowS(sleepTimeOffTime)));
+                    }
                     if((now-lastSdPlayMessage)/1000000>2){//2s no message from sd play
                         ESP_LOGE(UI_MAIN_LOG_TAG,"PLAYTIMEOUT");
                         mainSM=20;
@@ -727,8 +829,13 @@ void UI_MAIN_getFWupgradeFile(char* fwFileName,uint8_t* major,uint8_t* minor,uin
     ESP_LOGI(UI_MAIN_LOG_TAG, "No new firmware detected.");
 }
 
-uint8_t UI_MAIN_isImagePersisted(void)
-{
+/**
+  * @brief checks if the current running firmware image is persisted
+  *
+  * @return 0= image is not persisted, 1=image is persisted
+  * 
+  */
+uint8_t UI_MAIN_isImagePersisted(void){
     esp_ota_img_states_t imgState;
     const esp_partition_t *running = esp_ota_get_running_partition();
     ESP_ERROR_CHECK(esp_ota_get_state_partition(running, &imgState));
@@ -739,11 +846,22 @@ uint8_t UI_MAIN_isImagePersisted(void)
     return 1;
 }
 
+/**
+  * @brief persist a firmware image
+  *
+  */
 void UI_MAIN_persistImage(){
     esp_ota_mark_app_valid_cancel_rollback();
 }
 
-uint8_t UI_MAIN_buffer[16*1024];
+uint8_t UI_MAIN_buffer[16*1024];//keep the stack small
+
+/**
+  * @brief runs the whole firmware image process as state machine
+  *        returns only if no firmware upgrade was done and the player should
+  *        start normally, otherwise resets the system after upgrade run
+  *
+  */
 void UI_MAIN_fwUpgradeRun(){
     uint8_t fwSM=0;
     UI_MAIN_keyMessages_t keyMessage;
@@ -770,6 +888,8 @@ void UI_MAIN_fwUpgradeRun(){
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
                             fwSM++;
                             startTime=now;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            return;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                             return;
                         }
@@ -780,8 +900,17 @@ void UI_MAIN_fwUpgradeRun(){
                     break;
             case 1: SCREENS_fwUpgradeInit(newMajor,newMinor,newPatch,10-((now-startTime)/1000000));
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(20)) == pdPASS ){//wait for incoming key messages
-                        return;
-                    }
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            return;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            return;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            return;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            return;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            return;
+                        }                    }
                     if(((now-startTime)/1000000)>=10){
                         startTime=now;
                         fwSM++;
@@ -864,6 +993,10 @@ void UI_MAIN_fwUpgradeRun(){
     }
 }
 
+/**
+  * @brief initializes the main player logic which in turn initalizes most sub components
+  *
+  */
 void UI_MAIN_init(){
     UI_ELEMENTS_init();
     uint8_t imageFlags=0;

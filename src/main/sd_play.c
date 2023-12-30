@@ -61,6 +61,13 @@ SemaphoreHandle_t SD_PLAY_semStopPlaying;
 //stopping (ignores any stop or start requests but measures if stopping is not happening)->reset if timeout=3
 uint8_t SD_PLAY_internalSM=0;
 
+/**
+  * @brief get the queue handle of the sd play output channel
+  *        this is needed to allow putting this in a queue group
+  *
+  * @return queue handle
+  * 
+  */
 QueueHandle_t SD_PLAY_getMessageQueue(){
     return SD_PLAY_outQueue;
 }
@@ -91,6 +98,12 @@ esp_err_t SD_PLAY_volumeFilterClose(audio_element_handle_t self) {
 
 int64_t SD_PLAY_currentVolume = 0;
 
+/**
+  * @brief sets a new volume level, works during playing and in paused/stopped mode
+  *
+  * @param volume new volume level 0...10000
+  * 
+  */
 void SD_PLAY_volumeFilterSetVolume(int64_t volume) {
     if(volume>10000) volume=10000;
     if(volume<0) volume=0;
@@ -595,6 +608,12 @@ void SD_PLAY_messageLoopThread(){
     }
 }
 
+/**
+  * @brief starts all tasks and initializes the esp-adf components
+  * 
+  * @return 0=ok
+  * 
+  */
 uint8_t SD_PLAY_startService(){
     //init i2s port
     i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
@@ -630,6 +649,15 @@ uint8_t SD_PLAY_startService(){
     return 0;
 }
 
+/**
+  * @brief sends a message to the sd play service
+  *
+  * @param msg pointer to the message to send
+  * @param waitTime wait time in ms to wait for message queue insertion
+  * 
+  * @return 0=ok message sent, 2=timeout message not sent
+  * 
+  */
 uint8_t SD_PLAY_sendMessage(SD_PLAY_message_t* msg, uint16_t waitTime){
     if(SD_PLAY_inQueue==NULL) return 1;
     if(xQueueOverwrite(SD_PLAY_inQueue,msg)!=pdPASS){
@@ -638,7 +666,15 @@ uint8_t SD_PLAY_sendMessage(SD_PLAY_message_t* msg, uint16_t waitTime){
     return 0;
 }
 
-
+/**
+  * @brief received a message from the sd play service
+  *
+  * @param msg pointer to the message to get
+  * @param waitTime wait time in ms to wait for message queue reading
+  * 
+  * @return 0=ok message received, 2=timeout no new message available
+  * 
+  */
 uint8_t SD_PLAY_getMessage(SD_PLAY_message_t* msg, uint16_t waitTime){
     if(SD_PLAY_outQueue==NULL) return 1;
     memset(msg,0,sizeof(SD_PLAY_message_t));

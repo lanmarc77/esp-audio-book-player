@@ -18,26 +18,50 @@
 #include "ui_elements.h"
 #include "ff_handling.h"
 
-void SCREENS_noSdCard(){
+/**
+  * @brief shows a symbol to represent that no sd card was detected
+  *
+  */
+ void SCREENS_noSdCard(){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(3);
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows a symbol to represent that no audio book folder were found on the sd card
+  *
+  */
 void SCREENS_noFolders(){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(5);
     UI_ELEMENTS_update();
 }
 
-void SCREENS_folderSelect(uint16_t selectedFolder,uint16_t amountOfFolders,char* folderName){
+/**
+  * @brief shows the audio book folder select screen and the currently selected folder
+  *
+  * @param selectedFolder the number of the currently selected audio book folder
+  * @param amountOfFolder the amount of audio book folders
+  * @param folderName pointer to the name of the selected audio book folder
+  * @param secondsTime the wakeup time in seconds, needs to be >0 to be displayed
+  * 
+  */
+void SCREENS_folderSelect(uint16_t selectedFolder,uint16_t amountOfFolders,char* folderName,uint64_t secondsTime){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(6);
     UI_ELEMENTS_numberSelect(3,2,selectedFolder,amountOfFolders,1);
     UI_ELEMENTS_textScrolly(2,0,12,folderName);
+    if(secondsTime>0) UI_ELEMENTS_timeSelect(6,3,secondsTime,0);
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the currently scanning all audio book folders screen
+  *
+  * @param deciPercent a value from 0...1000 as deci percent of the scan process
+  * 
+  */
 void SCREENS_scanAllBooks(int32_t deciPercent){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(4);
@@ -45,12 +69,32 @@ void SCREENS_scanAllBooks(int32_t deciPercent){
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the currently scanning a single audio book folder content screen
+  *
+  * @param deciPercent a value from 0...1000 as deci percent of the scan process
+  * 
+  */
 void SCREENS_scanOneBook(int32_t deciPercent){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(7);
     UI_ELEMENTS_progressBar(deciPercent/10);
     UI_ELEMENTS_update();
 }
+
+/**
+  * @brief shows the paused screen if the player is paused/stopped and active chapter selection
+  *
+  * @param selectedFile the currently selected track/chapter/file number
+  * @param amountOfFiles amount of all tracks/chapters/files
+  * @param folderName pointer to the folderName of the currently active audio book
+  * @param currentPlayMinute the current listening position minute
+  * @param currentPlaySecond the current listening position second
+  * @param percent percentage of listening position
+  * @param batt current battery level in mV
+  * @param sleepTimeSecondsLeft if >0 the seconds left of the sleep timer is displayed
+  * 
+  */
 void SCREENS_pause0(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint32_t batt,uint32_t sleepTimeSecondsLeft){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_progressBar(percent);
@@ -63,6 +107,19 @@ void SCREENS_pause0(uint16_t selectedFile,uint16_t amountOfFiles,char* folderNam
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the paused screen if the player is paused/stopped and active time selection
+  *
+  * @param selectedFile the currently selected track/chapter/file number
+  * @param amountOfFiles amount of all tracks/chapters/files
+  * @param folderName pointer to the folderName of the currently active audio book
+  * @param currentPlayMinute the current listening position minute
+  * @param currentPlaySecond the current listening position second
+  * @param percent percentage of listening position
+  * @param batt current battery level in mV
+  * @param sleepTimeSecondsLeft if >0 the seconds left of the sleep timer is displayed
+  * 
+  */
 void SCREENS_pause1(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint32_t batt,uint32_t sleepTimeSecondsLeft){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_progressBar(percent);
@@ -75,6 +132,12 @@ void SCREENS_pause1(uint16_t selectedFile,uint16_t amountOfFiles,char* folderNam
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows low battery symbol shortly before switching off
+  *
+  * @param batt current battery level in mV
+  * 
+  */
 void SCREENS_lowBattery(uint32_t batt){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(12);
@@ -82,12 +145,34 @@ void SCREENS_lowBattery(uint32_t batt){
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the volume setup screen
+  *
+  * @param volume current volume level 0...10000
+  * 
+  */
 void SCREENS_volumeChange(int64_t volume){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_volume(volume);
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the play screen during playing a track
+  *
+  * @param selectedFile the currently selected track/chapter/file number
+  * @param amountOfFiles amount of all tracks/chapters/files
+  * @param folderName pointer to the folderName of the currently active audio book
+  * @param currentPlayMinute the current listening postion minute
+  * @param currentPlaySecond the current listening postion second
+  * @param percent percentage of listening postion
+  * @param searchFlags special flags for the current track (e.g. autorepeat)
+  * @param allPlayMinute minutes length of the current track
+  * @param allPlaySecond seconds length of the current track
+  * @param batt current battery level in mV
+  * @param sleepTimeSecondsLeft if >0 the seconds left of the sleep timer is displayed
+  * 
+  */
 void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint8_t searchFlags,uint16_t allPlayMinute,uint8_t allPlaySecond,uint32_t batt,uint32_t sleepTimeSecondsLeft){
     uint64_t now=esp_timer_get_time();
     UI_ELEMENTS_cls();
@@ -109,12 +194,25 @@ void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows a symbol to represent that the player is currently shutting down
+  *
+  */
 void SCREENS_switchingOff(){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(8);
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the inital fw upgrade notification screen
+  *
+  * @param major new major version
+  * @param minor new minor version
+  * @param patch new patch version
+  * @param timeout seconds left until an upgrade can be started
+  * 
+  */
 void SCREENS_fwUpgradeInit(uint8_t major,uint8_t minor,uint8_t patch,int8_t timeout){
     char b[10];
     UI_ELEMENTS_cls();
@@ -128,6 +226,12 @@ void SCREENS_fwUpgradeInit(uint8_t major,uint8_t minor,uint8_t patch,int8_t time
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the symbol during system start
+  *
+  * @param imageFlags specific firmware flags (e.g. if persisted)
+  * 
+  */
 void SCREENS_startUp(uint8_t imageFlags){
     char b[10];
     UI_ELEMENTS_cls();
@@ -142,6 +246,12 @@ void SCREENS_startUp(uint8_t imageFlags){
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the screen during a running fw upgrade
+  *
+  * @param percent percent of finished fw upgrade 0...100
+  * 
+  */
 void SCREENS_fwUpgradeRunning(int8_t percent){
     char b[10];
     UI_ELEMENTS_cls();
@@ -158,10 +268,30 @@ void SCREENS_fwUpgradeRunning(int8_t percent){
     UI_ELEMENTS_update();
 }
 
+/**
+  * @brief shows the setup screen for setting the sleep timer
+  *
+  * @param secondsLeft currently selected sleep time in s
+  * 
+  */
 void SCREENS_sleepTimer(uint32_t secondsLeft){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(8);
     UI_ELEMENTS_numberSelect(0,2,secondsLeft/60,99,1);
     UI_ELEMENTS_update();
 }
+
+/**
+  * @brief shows the setup screen for setting the wake up timer
+  *
+  * @param secondsLeft currently selected wake up time in s
+  * 
+  */
+void SCREENS_wakeupTimer(uint64_t secondsTime){
+    UI_ELEMENTS_cls();
+    UI_ELEMENTS_mainSymbol(16);
+    UI_ELEMENTS_timeSelect(6,3,secondsTime,1);
+    UI_ELEMENTS_update();
+}
+
 #endif

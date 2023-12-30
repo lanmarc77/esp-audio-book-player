@@ -21,7 +21,22 @@
 
 #define FF_LOG_TAG "FF"
 
-//ffType 0=directory, 1=files
+/**
+  * @brief  gets a sorted list of files or folders inside a given path
+  *
+  * @param[in] folderPath pointer to full vfs mounted path
+  * @param[out] amountOfEntries pointer which holds the number of sorted entries
+  * @param[out] sortedArry pointer to an an array which contains the IDs of the found files sorted ascending
+  * @param[in] ffType which type of entries to look for: 0=directory, 1=files
+  * @param[in] outQueue pointer to a queue handle where the current status of the finding/sorting can be reported for the UI
+  * @param[in] inQueue pointer to queue handle to stop the sorting process from the UI, send -1 to request a stop
+  * @param[in] searchString pointer to a string of one specific entrystring (usually a filename) whichs sorting position is to be reported in searchId
+  * @param[out] searchId pointer to a value which will hold the sorting postion of the file to be searched via searchString
+  * @param[out] flags bit0=repeat.dat found in folder, bit1: autostart.dat found in folder
+  * 
+  * @return 1=ok, finished (-1 is sent to outQueue), 2=folderPath not found (-2 is sent to outQueue)
+  *         3=to many entries (-3 is sent to outQueue), 4=canceld sorting/finding as requested (-4 is sent to outQueue)
+  */
 uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedIdArray,uint8_t ffType,QueueHandle_t* outQueue, QueueHandle_t* inQueue, char* searchString,int32_t* searchId,uint8_t* flags){
     uint16_t maxIdCounter=FF_MAX_SORT_ELEMENTS;//limits the files to sort even if more files exist
     struct dirent *currentEntry;
@@ -135,6 +150,16 @@ uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedId
     return 1;
 }
 
+/**
+  * @brief  gets a file/foldername inside a path by a given ID (position inside FAT)
+  *
+  * @param[in] folderBasePath pointer to full vfs mounted path
+  * @param[in] ID ID of file
+  * @param[out] resultName pointer to a char array where the name will be stored
+  * @param[in] ffType which type of entries to look for: 0=directory, 1=files
+  * 
+  * @return 0=ok, file found, 1=folderBasePath not found, 2=file not found
+  */
 uint8_t FF_getNameByID(char* folderBasePath,uint16_t ID,char *resultName,uint8_t ffType){
     struct dirent *currentEntry;
     /*if(folderBasePath[strlen(folderBasePath)-1]!='/'){

@@ -133,14 +133,29 @@ void BATTERY_battVoltageTask(){
     }
 }
 
+/**
+  * @brief   returns the current battery voltage in mV, the first 10s this value is
+  *          using a very fast and responsive filter afterwords a slow but steady filter
+  * 
+  * @return  filtered battery voltage in mV
+  */
 uint32_t BATTERY_getCurrentVoltage(){
     return BATTERY_current;
 }
 
+/**
+  * @brief   returns the current battery voltage in mV
+  *          this function always uses the slow but steady filter
+  * 
+  * @return  filtered battery voltage in mV
+  */
 uint32_t BATTERY_getCurrentVoltageStable(){
     return BATTERY_currentStable;
 }
 
+/**
+  * @brief    call once at program start to initalize the component
+  */
 void BATTERY_init(){
     xTaskCreate(BATTERY_battVoltageTask, "BATTERY_battVoltageTask", 1024 * 5, NULL, uxTaskPriorityGet(NULL), NULL);
 }

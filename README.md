@@ -11,7 +11,7 @@ A device that is meant to play non-DRM audio books from an SD card and has the f
 - file formats AMR-WB, MP3 and OGG
 - ASCII character based menu driven UI for 16x4 character screen
 - single rotary knob navigation
-- sleep timer 1...99min
+- sleep timer 1...99min, wakeup timer 1min...24hr
 - auto power off
 - firmware upgrades from SD card
 - based on pure esp-idf + esp-adf
@@ -28,29 +28,29 @@ development board:
 integrated in an old speaker that otherwise might have landed in the trash:  
 ![image](pictures/speaker_integrated.jpg)  
   
-the portable/smaller version:  
+the portable/smaller prototype version:  
 ![image](pictures/mobile_version.jpg)  
   
 [first poc](pictures/first_poc.jpg)
   
 # Why?
-Currently (2023) one really needs to search hard to find an offline only audio book player that is able to play
-files from an SD card and at the same time sorts the files based on their name and remembers and resumes
-the listening position.  
-Many people will use subscription services with the apps on their smartphone. These services and the apps
-can be canceled at any time. May it be politics or economic reasons. They usually do not allow you
-own the audio book but only sell a license to listen at it for as long as the company exists or is
-allowed to do business with you.  
+Currently (2023) one really needs to search hard to find an offline only non tracking audio book player that is
+able to play files from huge SD cards and at the same time sorts the files based on their name and remembers and
+resumes the last listening position.  
+Many people nowadays will use subscription services with corresponding apps on their smartphone. These services
+and the apps usually track the users. The can also be canceled at any time. May it be for politics or economic
+reasons. They usually do not allow you own the audio book but only sell a license to listen at it for as long
+as the company exists or is allowed to do business with you.  
 I have an audio book collection that I created by only buying if I can download the files or
-copy them e.g. from a CD to keep them.  
-All my audio books are stored in AMR-WB as for me the quality with 24kBit/s is good enough. This shrinks an MP3
-file to approx. 1/10ths when using AMR-WB and also makes the backup cheap. One CD with AMR-WB can hold
-60hrs, a DVD 350hrs, a 25GB BD-R 2000hrs+.  
+copy them e.g. from a CD to keep them. Without DRM.  
+All my audio books are converted to and then stored in AMR-WB as for me the quality with 24kBit/s mono is good enough.
+This shrinks an MP3 file to approx. 1/10ths when using AMR-WB and also makes the backup cheap. One CD with AMR-WB
+can hold 60hrs, a DVD 350hrs, a 25GB BD-R 2000hrs+.  
 Using existing electronics hardware modules and the software of this repository I can now build a device that
 just plays my audio books. Not more, not less. And it most likely will do so in 30years assuming nothing breaks.
 There are still 30yrs+ old Nintendo Gameboys that work like a charm and are being refurbished.  
-Additionally I can change the behavior of the software as I like. If necessary I can install the whole
-development environment in an offline virtual machine and will still be able to compile even if the
+Additionally I can change the behavior of the software as I like. The whole development environment works offline
+and can also be installed in an offline virtual machine and will still be able to compile even if the
 hardware manufacturer of the main controller board does not exist anymore.  
   
 # Videos
@@ -60,6 +60,8 @@ Download and watch:
 [Scenario3](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario3.mp4): sorting  
 [Scenario4](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario4.mp4): auto bookmarks  
 [Scenario5](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario5.mp4): sleep timer  
+[Scenario6](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario6.mp4): wakeup timer  
+[Scenario7](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario7.mp4): firmware upgrade  
   
 # Hardware
 The build only needs a few components that are manufactured by companies in mass and therefore cheap.  
@@ -67,9 +69,9 @@ For PCB based components the schematics are available in the module datasheets f
   
 **Main controller board:**  
 The main controller board is a Heltec WiFi Kit 32 V3. It was chosen because it has a very small deep sleep
-current of about 10µA. I measured 15µA still very good. It already comes with the circuitry to connect
-and charge a rechargeable battery as well as the possibility to disconnect other components from power
-by using a software programmable power pin (Ve).  
+current of about 10µA. I measured 15µA with nothing connected to it. Still very good. It already comes with
+the circuitry to connect and charge a rechargeable battery as well as the possibility to disconnect other
+components from power by using a software programmable power pin (Ve).  
 Finally an OLED display is also already available for the UI.  
 Be aware that you buy V3 of this board version as it has the low deep sleep current. Otherwise your battery
 looses way too much energy even if you do not use the player. Additionally verify that you also get a fitting
@@ -127,7 +129,7 @@ which order you solder the wires as you might not get to them anymore.
 The runtime of the system is highly dependent on the current consumption. The current consumption depends on the
 type of audio played and mostly the volume. The following measurements were made using the
 setup prototype development board as seen above with 8 Ohm speaker OWS-131845W50A-8, 3.7V, 4GB class 10 Transcend
-microSD. An UNI-T UT61E 61a with a 22µF tantal smoothing capacitor to handle the current peaks was used.  
+microSD. An UNI-T UT61E with a 22µF tantal smoothing capacitor to handle the current peaks was used.  
 
   
 | scenario                             | volume setting  | current |
@@ -159,9 +161,9 @@ At high volumes the energy needed by the speaker dominates the current consumpti
 not very stable and highly depends on the content that is actually played.  
 The volume setting actually follows an x⁴ curve for translating % into power to fit our hearing.  
   
-An 18650 battery with 2500mAh will most likely hold 50hrs assuming average volume levels between 50%...75%.  
+An 18650 battery with 2500mAh will most certainly hold 50hrs assuming average volume levels between 50%...75%.  
   
-# UI navigation
+# UI navigation / usage manual
 TODO
   
 # Uploading initial binary release
@@ -206,7 +208,7 @@ XX are letters from A-F or/and numbers from 0-9 specifying the firmware version 
 Place the file on the SD card in a folder called `fwupgrade`. Once you start the device it should
 present you with the upgrade screen. The upgrade screen is left without upgrading if no user interaction is
 happening for 10s.  
-If you wish to upgrade shortly press the knob button . A countdown of 10s gives you the possibility
+If you wish to upgrade shortly press the knob button. A countdown of 10s gives you the possibility
 to stop the upgrade if you press the knob button. Once the upgrade started you can not interrupt it.
 The actual writing process for the upgrade takes around 10s and the progress is shown.  
   
@@ -234,7 +236,11 @@ To disable delete file idf_components.yml in components/esp-adf-libs/ and change
 so that no nghttp is present anymore. Now complete offline compilation is possible.  
   
 Take a look into the `src/patches/` directory for more details and .patch files to apply to above sdk versions.
-
+  
+# Software architecture
+TODO  
+components, file structure, naming conventions, tasks, communication queues
+  
 # Limitations/won't do's
 TODO
 
@@ -245,7 +251,7 @@ TODO
 - mp3/ogg chapter support
 - mp3/ogg cbr/vbr
 - file/folder charsets other than ascii
-- bluetooth audio
+- bluetooth audio (classic vs. LE audio)
 - playing speed
 - equalizer
 - upload on SD card not via ESP USB connector
@@ -260,7 +266,6 @@ TODO:
   
 # Ideas/future
 - multi user support
-- wake up timer
 - audio navigation for handicapped people
-- PCB with fitting 3D printable case or fitting for a cheap buyable case
+- printed PCB with fitting 3D printable case or fitting for a cheap buyable case
 

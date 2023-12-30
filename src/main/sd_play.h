@@ -13,10 +13,15 @@
 */
 #ifndef SD_PLAY_H
 #define SD_PLAY_H
+/*
+    This component handles the esp-adf pipelines and the whole playing process
+    It uses queues for communication and spawns own tasks
+*/
 #include <stdint.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
+//all msgTypes
 #define SD_PLAY_MSG_TYPE_START_PLAY 1
 #define SD_PLAY_MSG_TYPE_STOP_PLAY 2
 #define SD_PLAY_MSG_TYPE_STOPPED_NO_ERROR 3
@@ -26,12 +31,6 @@
 typedef struct {
     uint8_t msgType;
     char* msgData;
-    //using offset, blockSize and filePos the current timestamp can be calculated as follows
-    //for AMR: each block is exactly 20ms long as per format definition
-    //         timestamp in s=(filePos-offset/blockSize)*0.02;
-
-    //for MP3: timestamp in s = (((filePos-offset)*8)/bitrateInkBitPerS)/1000;
-    //              blockSize = ( 1152 / 8 ) * bitrateInkBitPerS / SampleRateinKhz
     uint64_t filePos;
     uint64_t offset;
     uint64_t blockSize;
@@ -41,18 +40,10 @@ typedef struct {
 } SD_PLAY_message_t;
 
 
-//returns 0 on success
 uint8_t SD_PLAY_startService();
-
-//returns 0 on success
 uint8_t SD_PLAY_sendMessage(SD_PLAY_message_t* msg, uint16_t waitTime);
-
-//returns 0 on success, 1 for timeout
 uint8_t SD_PLAY_getMessage(SD_PLAY_message_t* msg, uint16_t waitTime);
-
-//volume 0 ... 10000
 void SD_PLAY_volumeFilterSetVolume(int64_t volume);
-
 QueueHandle_t SD_PLAY_getMessageQueue();
 
 #endif

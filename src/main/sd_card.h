@@ -13,14 +13,16 @@
 */
 #ifndef SD_CARD_H
 #define SD_CARD_H
-
 /*
     Handles low level SD card handling like bus initialization and mounting into esp VFS
 */
 
 #define SD_CARD_USE_SD_MODE
+//mount point in the VFS
 #define SD_CARD_MOUNT_POINT "/a"
+//directory name to search for new firmware
 #define FW_DIR_NAME "fwupgrade"
+//full directory path of new firmware folder
 #define FW_DIR_PATH SD_CARD_MOUNT_POINT"/"FW_DIR_NAME
 
 //connector DO | DAT0
@@ -42,9 +44,7 @@
 #define SD_CARD_PIN_D3 26
 
 
-//initalizes SD card bus and ounts the card from esp vfs
 uint8_t SD_CARD_init();
-//deinitalizes SD card bus and umounts the card from esp vfs
 uint8_t SD_CARD_deInit();
 
 #endif

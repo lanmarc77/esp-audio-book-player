@@ -36,3 +36,4 @@ src/.vscode/
 
 #esp build directory
 src/build/
+src/sdkconfig.old
