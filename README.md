@@ -125,6 +125,12 @@ Pictures of manually wired PCB:
 These PCBs have headers for the components. You can leave these out but then need to make sure in 
 which order you solder the wires as you might not get to them anymore.   
   
+## Printed buyable PCB
+TODO
+  
+## Printed/buyable case
+TODO
+  
 ## Current measurements / battery life
 The runtime of the system is highly dependent on the current consumption. The current consumption depends on the
 type of audio played and mostly the volume. The following measurements were made using the
@@ -238,8 +244,135 @@ so that no nghttp is present anymore. Now complete offline compilation is possib
 Take a look into the `src/patches/` directory for more details and .patch files to apply to above sdk versions.
   
 # Software architecture
-TODO  
-components, file structure, naming conventions, tasks, communication queues
+  
+```
+
+ -----------------
+|   ssd1306*.*    |           -----------------------
+|                 |          |       battery.*       |
+| low level I²C   |          |                       |
+| functions for   |          | monitors, filters     |
+| OLED and fonts  |          | and offers the        |
+|                 |          | current battery level |
+ -----------------           |                       |
+         ^                   | uses task             |
+         |                   |                       |
+         | calls              -----------------------
+         |                     ^
+ --------------------          |
+|   ui_elements.*    |         | calls
+|                    |         |
+| offers reusable    |         |
+| UI elements        |         |                                       --------------------------
+|                    |         |    ---------------------------       |         sd_play.*        |
+ --------------------          |   |     rotary_encoder.*      |      |                          |
+           ^                   |   |                           |      | plays files from SD card |
+           |                   |   | low level rotary encoder  |      | using esp-adf pipelines  |
+           | calls             |   | and switch handling       |      |                          |
+           |                   |   |                           |      |                          |
+ ------------------------      |   | uses task + interrupt     |      | uses tasks               |
+|       screens.*        |     |   |                           |      |                          |
+|                        |     |    ---------------------------        --------------------------
+| creates and displays   |     |     ^                                  ^                       |
+| complete screen        |     |     |                                  |                       |
+| layouts                |     |     | calls                            | calls                 |
+|                        |<-   |     | queue communication              | queue communication   |
+ ------------------------   |  |     |                                  |                       |
+                            |  |     |           -----------------------                        |
+                      calls |  |     |          |                                               |
+                            |  |     v          v                                         calls |
+ -----------             --------------------------                                             |
+|   main.*  |           |        ui_main.*         |             --------------------------     |
+|           |  calls    |                          |            |      format_helper.*     |<---
+|  basic    | --------> |    main player logic     |    calls   |                          |
+|  board    |           |                          | ---------> | functions to get audio   |
+|  init and |           |   state machine based    |            | format specific          |
+|  deinit   |           |                          |            | information like         |
+|           |           |                          |            | runtime and bitrate      |
+ -----------            |                          |            |                          |
+                        |                          |             --------------------------
+       ---------------- |                          |
+      |                 |                          |<-----------
+      |                  --------------------------             |
+      |                                |                        |
+      | calls                          | calls                  | calls +
+      |                                |                        | queue communication
+      v                                v                        v
+ --------------------         ----------------------         -----------------------------
+|     sd_card.*      |       |        saves.*       |       |        ff_handling.*        |
+|                    |       |                      |       |                             |
+|  low level SPI     |       | handles save         |       | reads and sorts dirs/files  |
+|  bus handling and  |       | restore and house    |       | an returns sorted lists     |
+|  VFS mount/umount  |       | keeping of bookmarks |       |                             |
+|                    |       | and player settings  |       | uses task for sorting       |
+ --------------------        |                      |       |                             |
+                              ----------------------         ------------------------------
+
+```  
+The following sub chapters will give an insight into each shown component and its architecture ideas.  
+This layout shows the ideal model that only very rarely is broken in the code.  
+  
+## main.*
+The entry point of the application. It initializes the board and sets up the CPU, disables WiFi and
+hands over to the other components.  
+Function main() is never left but if other components finish powers off the board and sets up a
+wake up timer if needed.  
+  
+## ui_main.*
+This component implements the main player logic. A state machine represents the navigation of the user
+and the state the player is currently in.  
+As the central component it makes direct use of a all the other components.  
+  
+## sd_card.*
+This component initializes the SPI bus for usage with an SD card and tries to mount the SD card
+into the ESPs VFS so it can be used by all other components using file access functions.  
+  
+## rotary_encoder.*
+This component initializes and monitors the rotary encoder and switch using a task and and interrupt.  
+Events are generated and placed as messages into a queue for communicating with other components.  
+  
+## battery.*
+This component initializes and monitors the AD converter for monitoring the battery level.  
+There are two battery levels available. With slower noise filtering and with faster more noisy filtering.  
+A task samples the battery voltage every 500ms.  
+  
+## screens.*, ui_elements.*, ssd1306*.*
+This collection of components uses a typical layered approach.  
+The ssd1306 functions give access to a physical display. Here the OLED of the board.  
+The ui_elements functions use the ssd306 functions to offer reusable UI elements like text output or
+progress meters with which larger screen layouts can be built.  
+The screens functions use the ui_elements functions to create a complete screen layout for the player.  
+It is assumed that the display can handle a layout of 16x4 ASCII characters.  
+  
+## saves.*
+This component handles the storage, retrieval and house keeping of bookmarks and the settings (like volume)
+if the player. It makes use of the ESP VFS system and currently stores everything in the internal SPIFFS.  
+It also takes care of initializing the SPIFFS.  
+  
+## ff_handling.*
+This component scans folders and files within folders and delivers a sorted list. It uses a task for the
+longer running scanning and sorting process and communicates its progress via a queue. The scanning and
+sorting process can also be canceled via queue communication. During scanning and sorting the CPU
+frequency is increased to speed up the process.  
+  
+## format_helper.*
+This component offers audio file format functions. One can convert byte position <-> time stamp and
+determine sample rates and bitrates and further information to setup the esp-adf pipeline correctly
+right from the start.  
+  
+## sd_play.*
+This components tries to abstract all the esp-adf functionality of playing an audio stream with in the pipeline.
+It combines SD card access by allowing to start playing a file from the SD card using a task.  
+Using queues the components can be instructed to start/stop the playing and contentiously reports the current
+playing position for the user interface.  
+The resume function that actually is not out of the box supported by a pipeline based streaming approach is
+implemented by adding an own file stream handler within the pipeline that takes care of at first delivering needed
+header information for the decoder but then jumps within the file to the position to resume from.  
+  
+## naming conventions
+Filenames and global variables/functions match each others prefixes to easily be able to locate them.  
+Prefixes are written in capital case and use _ as separator.  
+Apart from the prefixes variables and functions use camel case.  
   
 # Limitations/won't do's
 TODO

@@ -25,7 +25,6 @@
 #include "esp_sleep.h"
 #include "driver/rtc_io.h"
 
-#include "sd_card.h"
 #include "sd_play.h"
 #include "ui_main.h"
 
@@ -125,7 +124,6 @@ void app_main(void)
 
     UI_MAIN_run(startUpFlags);
 
-    SD_CARD_deInit();
     UI_MAIN_deInit();
 
     while(1){

@@ -154,6 +154,7 @@ void UI_MAIN_rotaryTask(void *parm){
 void UI_MAIN_deInit(){
     // All done, unmount partition and disable SPIFFS
     SAVES_deInit();
+    SD_CARD_deInit();
     ESP_LOGI(UI_MAIN_LOG_TAG, "SPIFFS unmounted");
 }
 
