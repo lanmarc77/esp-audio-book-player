@@ -28,6 +28,8 @@
 #define SD_PLAY_MSG_TYPE_STOPPED_ERROR 4
 #define SD_PLAY_MSG_TYPE_FILEPOS_STATE 5
 
+//#define SD_PLAY_HW_MUTE_PIN -1
+
 typedef struct {
     uint8_t msgType;
     char* msgData;
@@ -39,7 +41,7 @@ typedef struct {
     int32_t channels;
 } SD_PLAY_message_t;
 
-
+void SD_PLAY_init();
 uint8_t SD_PLAY_startService();
 uint8_t SD_PLAY_sendMessage(SD_PLAY_message_t* msg, uint16_t waitTime);
 uint8_t SD_PLAY_getMessage(SD_PLAY_message_t* msg, uint16_t waitTime);

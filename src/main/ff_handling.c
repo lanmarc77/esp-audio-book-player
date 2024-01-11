@@ -18,6 +18,7 @@
 #include "esp_vfs.h"
 #include "ff_handling.h"
 #include "sd_card.h"
+#include "ui_main.h"
 
 #define FF_LOG_TAG "FF"
 
@@ -31,7 +32,7 @@
   * @param[in] outQueue pointer to a queue handle where the current status of the finding/sorting can be reported for the UI
   * @param[in] inQueue pointer to queue handle to stop the sorting process from the UI, send -1 to request a stop
   * @param[in] searchString pointer to a string of one specific entrystring (usually a filename) whichs sorting position is to be reported in searchId
-  * @param[out] searchId pointer to a value which will hold the sorting postion of the file to be searched via searchString
+  * @param[out] searchId pointer to a value which will hold the sorting postion in the sortedIdArray of the file to be searched via searchString
   * @param[out] flags bit0=repeat.dat found in folder, bit1: autostart.dat found in folder
   * 
   * @return 1=ok, finished (-1 is sent to outQueue), 2=folderPath not found (-2 is sent to outQueue)
@@ -40,25 +41,67 @@
 uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedIdArray,uint8_t ffType,QueueHandle_t* outQueue, QueueHandle_t* inQueue, char* searchString,int32_t* searchId,uint8_t* flags){
     uint16_t maxIdCounter=FF_MAX_SORT_ELEMENTS;//limits the files to sort even if more files exist
     struct dirent *currentEntry;
-    DIR *dir = opendir(folderPath);
+    DIR *dir = NULL;
     char minLastName[FF_FILE_PATH_MAX];
     char minNewCandidateName[FF_FILE_PATH_MAX];
+    char fileLine[FF_FILE_PATH_MAX];
     uint16_t sortedPosition=0;
     uint16_t maxFiles=0;
-    minLastName[0]=0;
-    minNewCandidateName[0]=0;
-    uint64_t startTime=esp_timer_get_time();
+    //uint64_t startTime=esp_timer_get_time();
     *amountOfEntries=0;
     int32_t outQueueMsg=0;
     int32_t inQueueMsg=0;
+
+    //checking for presorted folder list
+    if(ffType==0){
+        strcpy(&minLastName[0],folderPath);strcat(&minLastName[0],"/presorted.txt");
+        FILE* preSortedFile=NULL;
+        preSortedFile=fopen(&minLastName[0],"r");
+        struct stat st;
+        if(preSortedFile!=NULL){
+            stat(&minLastName[0], &st);
+            while(fgets(&fileLine[0],sizeof(fileLine),preSortedFile)!=NULL){
+                uint16_t l=strlen(&fileLine[0]);
+                fpos_t currentFilePos=0;
+                if(fgetpos(preSortedFile,&currentFilePos)==0){
+                    outQueueMsg=(1000*currentFilePos)/st.st_size;
+                    xQueueOverwrite(*outQueue,&outQueueMsg);
+                }
+                if((l>0)&&(fileLine[l-1]==0x0A)){fileLine[l-1]=0; l--;}
+                if((l>0)&&(fileLine[l-1]==0x0D)){fileLine[l-1]=0; l--;}
+                if((l>0)&&(fileLine[0]!='#')){
+                    sortedPosition++;
+                    sortedIdArray[sortedPosition-1]=sortedPosition;
+                    //ESP_LOGI(FF_LOG_TAG,"Storing %s at %d as %d",&fileLine[0],sortedPosition-1,sortedPosition);
+                    *amountOfEntries=sortedPosition;
+                    if((searchString!=NULL)&&(searchString[0]!=0)){
+                        if(strcasecmp(&fileLine[0],&searchString[0])==0){
+                            *searchId=sortedPosition-1;
+                            //ESP_LOGI(FF_LOG_TAG,"Found: %s at %d",&fileLine[0],sortedPosition);
+                        }
+                    }
+                }
+                if(sortedPosition>=FF_MAX_FOLDER_ELEMENTS){
+                    break;
+                }
+            }
+            fclose(preSortedFile);
+            outQueueMsg=-1;
+            xQueueOverwrite(*outQueue,&outQueueMsg);
+            return 1;
+        }
+    }
+
+    minNewCandidateName[0]=0;
+    minLastName[0]=0;
+    dir = opendir(folderPath);
     ESP_LOGI(FF_LOG_TAG,"Scanning: %s",folderPath);
     if(dir){
-        memset(&sortedIdArray[0],0,FF_MAX_SORT_ELEMENTS*2);
-            
         do{
             uint16_t minNewCandidateID=0,positionCounter=0;
             minNewCandidateName[0]=0;
             while (((currentEntry = readdir(dir)) != NULL)&&(positionCounter<maxIdCounter)) {
+                if(currentEntry->d_name[0]=='?') continue; //name contains invalid charactes for current code page
                 if((ffType==0)&&(currentEntry->d_type!=DT_DIR)){//directory needs to be directory type
                     continue;
                 }else if((ffType==1)&&(currentEntry->d_type==DT_DIR)){//file is not allowed to have directory type
@@ -71,12 +114,12 @@ uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedId
                 }
                 if(ffType==1){//check valid file extensions
                     uint16_t l=strlen(currentEntry->d_name);
-                    if(strcmp(&currentEntry->d_name[0],"repeat.dat")==0){
+                    if(strcmp(&currentEntry->d_name[0],"repeat.dat")==0){//TODO: remove and put to user settings
                         if(flags!=NULL){
                             *flags|=FF_REPEAT_FLAG;
                         }
                     }
-                    if(strcmp(&currentEntry->d_name[0],"autostart.dat")==0){
+                    if(strcmp(&currentEntry->d_name[0],"autostart.dat")==0){//TODO: remove and put to user settings
                         if(flags!=NULL){
                             *flags|=FF_AUTOSTART_FLAG;
                         }
@@ -84,6 +127,7 @@ uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedId
                     if(!((strncasecmp(&currentEntry->d_name[l-3],"mp3",3)==0) ||
                          (strncasecmp(&currentEntry->d_name[l-3],"awb",3)==0) ||
                          (strncasecmp(&currentEntry->d_name[l-3],"amr",3)==0) ||
+                         //mpeg4 audio is too buggy and picky in esp-adf
                          /*(strncasecmp(&currentEntry->d_name[l-3],"m4a",3)==0) ||
                          (strncasecmp(&currentEntry->d_name[l-3],"aac",3)==0) ||
                          (strncasecmp(&currentEntry->d_name[l-3],"m4b",3)==0) ||*/
@@ -137,6 +181,7 @@ uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedId
                     }
                 }
                 sortedIdArray[sortedPosition++]=minNewCandidateID;
+                //ESP_LOGI(FF_LOG_TAG,"Storing %s at %d as %d",&minLastName[0],sortedPosition-1,minNewCandidateID);
             }
         }while(minNewCandidateName[0]!=0);
         closedir(dir);
@@ -149,6 +194,9 @@ uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedId
     xQueueOverwrite(*outQueue,&outQueueMsg);
     return 1;
 }
+
+char FF_getNameByIdCacheFolderName[FF_FILE_PATH_MAX];
+int32_t FF_getNameByIdCacheId=-1;
 
 /**
   * @brief  gets a file/foldername inside a path by a given ID (position inside FAT)
@@ -165,8 +213,47 @@ uint8_t FF_getNameByID(char* folderBasePath,uint16_t ID,char *resultName,uint8_t
     /*if(folderBasePath[strlen(folderBasePath)-1]!='/'){
         strcat(folderBasePath,"/");
     }*/
-    DIR *dir = opendir(folderBasePath);
+    char fileLine[FF_FILE_PATH_MAX];
+    char preSortedFileName[FF_FILE_PATH_MAX];
+    DIR *dir = NULL;
     uint16_t idCounter=0;
+    
+    //ESP_LOGI(FF_LOG_TAG,"Requested: %d",ID);
+    //checking for presorted folder list
+    if(ffType==0){
+        if((FF_getNameByIdCacheId>=0)&&(FF_getNameByIdCacheId==ID)){
+            strcpy(resultName,&FF_getNameByIdCacheFolderName[0]);
+            return 0;
+        }
+        UI_MAIN_cpuFull();
+        strcpy(&preSortedFileName[0],folderBasePath);strcat(&preSortedFileName[0],"/presorted.txt");
+        FILE* preSortedFile=NULL;
+        preSortedFile=fopen(&preSortedFileName[0],"r");
+        if(preSortedFile!=NULL){
+            while(fgets(&fileLine[0],sizeof(fileLine),preSortedFile)!=NULL){
+                uint16_t l=strlen(&fileLine[0]);
+                if((l>0)&&(fileLine[l-1]==0x0A)){fileLine[l-1]=0; l--;}
+                if((l>0)&&(fileLine[l-1]==0x0D)){fileLine[l-1]=0; l--;}
+                if((l>0)&&(fileLine[0]!='#')){
+                    idCounter++;
+                    if(idCounter==ID){
+                        //ESP_LOGI(FF_LOG_TAG,"Found2: %d %s",ID,&fileLine[0]);
+                        strcpy(resultName,&fileLine[0]);
+                        FF_getNameByIdCacheId=ID;
+                        strcpy(&FF_getNameByIdCacheFolderName[0],&fileLine[0]);
+                        fclose(preSortedFile);
+                        UI_MAIN_cpuNormal();
+                        return 0;
+                    }
+                }
+            }
+            fclose(preSortedFile);
+            UI_MAIN_cpuNormal();
+            return 2;
+        }
+    }
+
+    dir = opendir(folderBasePath);
     if(dir){
         while ((currentEntry = readdir(dir)) != NULL) {
             if((ffType==0)&&(currentEntry->d_type!=DT_DIR)){//directory needs to be directory type
@@ -179,11 +266,17 @@ uint8_t FF_getNameByID(char* folderBasePath,uint16_t ID,char *resultName,uint8_t
                 if(!((strncasecmp(&currentEntry->d_name[l-3],"mp3",3)==0) ||
                         (strncasecmp(&currentEntry->d_name[l-3],"awb",3)==0) ||
                         (strncasecmp(&currentEntry->d_name[l-3],"amr",3)==0) ||
+                         //mpeg4 audio is too buggy and picky in esp-adf
                         /*(strncasecmp(&currentEntry->d_name[l-3],"m4a",3)==0) ||
                         (strncasecmp(&currentEntry->d_name[l-3],"aac",3)==0) ||
                         (strncasecmp(&currentEntry->d_name[l-3],"m4b",3)==0) ||*/
                         (strncasecmp(&currentEntry->d_name[l-3],"ogg",3)==0)))
                 {
+                    continue;
+                }
+            }
+            if(ffType==0){
+                if(strcmp(&currentEntry->d_name[0],FW_DIR_NAME)==0){//ignore fwupgrade directory
                     continue;
                 }
             }

@@ -46,5 +46,6 @@
 
 uint8_t SD_CARD_init();
 uint8_t SD_CARD_deInit();
+uint64_t SD_CARD_getSize();
 
 #endif

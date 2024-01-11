@@ -250,6 +250,9 @@ uint16_t SD_PLAY_amrWBitrates[16]={6600,8850,12650,14250,15850,18250,19850,23050
   * @param[out] bitrate pointer where the bitrate of the file be stored
   * @param[out] blockSize pointer where the blocksize (also framesize) will be stored
   * @param[in] fileSize the size of the file
+  * @param[out] upMix pointer for a boolean which determines if single channel audio should upmixed
+  *                   to stereo so that left and right are identical, some DACs need this or they play
+  *                   audio only on one side of the headphone
   * 
   * @return 0=ok, 1=error
   */
@@ -282,7 +285,8 @@ uint16_t SD_PLAY_amrWBitrates[16]={6600,8850,12650,14250,15850,18250,19850,23050
 }
 
 /**
-  * @brief  gets M4A specific format information of a file
+  * @brief  gets M4A specific format information of a file, currently unused as mpeg4 audio
+  *         is pretty buggy on esp-adf
   *
   * @param[in] file handle to a M4A file to check
   * @param[out] sampleRate pointer where the sample rate of the file will be stored

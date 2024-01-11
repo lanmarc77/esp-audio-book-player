@@ -403,7 +403,7 @@ void UI_ELEMENTS_textScrolly(uint8_t x,uint8_t y, uint8_t length, char *string){
     memset(&scrollyText[0],0,sizeof(scrollyText));
     if(UI_ELEMENTS_lastTextScrollyTimestamp!=0){
         if(UI_ELEMENTS_lastTextScrollyPos==0){//full display length before scrolling starts is longer
-            if((esp_timer_get_time()-UI_ELEMENTS_lastTextScrollyTimestamp)/1000>150*length){
+            if((esp_timer_get_time()-UI_ELEMENTS_lastTextScrollyTimestamp)/1000>100*length){
                 UI_ELEMENTS_lastTextScrollyPos++;
                 UI_ELEMENTS_lastTextScrollyTimestamp=esp_timer_get_time();
             }

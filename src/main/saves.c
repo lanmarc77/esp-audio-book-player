@@ -206,7 +206,7 @@ uint8_t SAVES_saveBookmark(char* folderName,SAVES_saveState_t* save){
     strcpy(&save->folderName[0],folderName);
     int32_t result=fwrite(save,1,sizeof(SAVES_saveState_t),f);
     if(result==sizeof(SAVES_saveState_t)){
-        //ESP_LOGI(SAVES_LOG_TAG,"Saved ok");
+        ESP_LOGI(SAVES_LOG_TAG,"Saved ok. Free space: %li",SAVES_getUsedSpaceLevel());
         fclose(f);
         return 0;
     }else{
@@ -231,7 +231,7 @@ void SAVES_cleanOldBookmarks(){
     if(dir){
         while ((currentEntry = readdir(dir)) != NULL) {
             if(currentEntry->d_type!=DT_DIR){
-                if(currentEntry->d_name[strlen(currentEntry->d_name)-1]=='b'){
+                if(currentEntry->d_name[strlen(currentEntry->d_name)-1]=='b'){//file extension .b?
                     strcpy(&fullfile[0],"/s/");
                     strcat(&fullfile[0],currentEntry->d_name);
                     f = fopen(&fullfile[0], "rb");
@@ -265,4 +265,18 @@ void SAVES_cleanOldBookmarks(){
     }
 }
 
+/**
+  * @brief get the free space of SPIFFS storage in percent
+  * 
+  * @return -1=error, bookmark stored, >=0, 0...100 percent
+  */
+int32_t SAVES_getUsedSpaceLevel(){
+    size_t total = 0, used = 0;
+    if ((esp_spiffs_info(SAVES_spiffsConf.partition_label, &total, &used) != ESP_OK)||(used>total)) {
+        ESP_LOGE(SAVES_LOG_TAG, "Failed to get SPIFFS partition information.");
+        return -1;
+    }
+    //ESP_LOGI(SAVES_LOG_TAG, "Used: %d, total %d",used,total);
+    return used*100/total;
+}
 #endif

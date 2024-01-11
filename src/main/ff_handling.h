@@ -28,9 +28,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
+//maximum folders to use at all
+#define FF_MAX_FOLDER_ELEMENTS 9999
+//stop sorting after this many elements as it simply gets to slow
 #define FF_MAX_SORT_ELEMENTS 1010
 #define FF_FILE_PATH_MAX 256
+//if bit set, the folder should be repeated
 #define FF_REPEAT_FLAG 1
+//if bit set, the folder should start playing automatically
 #define FF_AUTOSTART_FLAG 2
 
 uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedIdArray,uint8_t ffType,QueueHandle_t* outQueue, QueueHandle_t* inQueue, char* searchString,int32_t* searchId,uint8_t* flags);

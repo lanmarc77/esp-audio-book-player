@@ -125,11 +125,11 @@ Pictures of manually wired PCB:
 These PCBs have headers for the components. You can leave these out but then need to make sure in 
 which order you solder the wires as you might not get to them anymore.   
   
-## Printed buyable PCB
-TODO
+## Buyable manufactured PCB
+TODO: One or tow PCB layouts as motherboard for a 3D printed base case and a worldwide buyable case.  
   
 ## Printed/buyable case
-TODO
+TODO: 3D case model and worldwide buyable model  
   
 ## Current measurements / battery life
 The runtime of the system is highly dependent on the current consumption. The current consumption depends on the
@@ -263,27 +263,27 @@ Take a look into the `src/patches/` directory for more details and .patch files 
 |   ui_elements.*    |         | calls
 |                    |         |
 | offers reusable    |         |
-| UI elements        |         |                                       --------------------------
-|                    |         |    ---------------------------       |         sd_play.*        |
- --------------------          |   |     rotary_encoder.*      |      |                          |
-           ^                   |   |                           |      | plays files from SD card |
-           |                   |   | low level rotary encoder  |      | using esp-adf pipelines  |
-           | calls             |   | and switch handling       |      |                          |
-           |                   |   |                           |      |                          |
- ------------------------      |   | uses task + interrupt     |      | uses tasks               |
-|       screens.*        |     |   |                           |      |                          |
-|                        |     |    ---------------------------        --------------------------
-| creates and displays   |     |     ^                                  ^                       |
-| complete screen        |     |     |                                  |                       |
-| layouts                |     |     | calls                            | calls                 |
-|                        |<-   |     | queue communication              | queue communication   |
- ------------------------   |  |     |                                  |                       |
-                            |  |     |           -----------------------                        |
-                      calls |  |     |          |                                               |
-                            |  |     v          v                                         calls |
- -----------             --------------------------                                             |
-|   main.*  |           |        ui_main.*         |             --------------------------     |
-|           |  calls    |                          |            |      format_helper.*     |<---
+| UI elements        |         |                                   --------------------------
+|                    |         |    ---------------------------   |         sd_play.*        |
+ --------------------          |   |     rotary_encoder.*      |  |                          |
+           ^                   |   |                           |  | plays files from SD card |
+           |                   |   | low level rotary encoder  |  | using esp-adf pipelines  |
+           | calls             |   | and switch handling       |  |                          |
+           |                   |   |                           |  |                          |
+ ------------------------      |   | uses task + interrupt     |  | uses tasks               |
+|       screens.*        |     |   |                           |  |                          |
+|                        |     |    ---------------------------    --------------------------
+| creates and displays   |     |     ^                              ^                      |
+| complete screen        |     |     |                              |                      |
+| layouts                |     |     | calls                        | calls                |
+|                        |<-   |     | queue communication          | queue communication  |
+ ------------------------   |  |     |                              |                      |
+                            |  |     |           -------------------                   ----
+                      calls |  |     |          |                                     |
+                            |  |     v          v                               calls |
+ -----------             --------------------------                                   v
+|   main.*  |           |        ui_main.*         |             --------------------------
+|           |  calls    |                          |            |      format_helper.*     |
 |  basic    | --------> |    main player logic     |    calls   |                          |
 |  board    |           |                          | ---------> | functions to get audio   |
 |  init and |           |   state machine based    |            | format specific          |

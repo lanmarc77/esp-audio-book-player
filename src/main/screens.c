@@ -196,11 +196,17 @@ void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,
 
 /**
   * @brief shows a symbol to represent that the player is currently shutting down
-  *
+  * @param sdSizeMB raw size of the SD card in MB
+  * @param SPIFFSUsagePercent SPIFSS fill level in % 0..100
   */
-void SCREENS_switchingOff(){
+void SCREENS_switchingOff(uint64_t sdSizeMB,uint8_t SPIFFSUsagePercent){
+    char s[20];
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(8);
+    sprintf(&s[0],"%7lluMB",sdSizeMB);
+    UI_ELEMENTS_textScrolly(3,2,12,&s[0]);
+    sprintf(&s[0],"%3d%%",SPIFFSUsagePercent);
+    UI_ELEMENTS_textScrolly(5,3,5,&s[0]);
     UI_ELEMENTS_update();
 }
 

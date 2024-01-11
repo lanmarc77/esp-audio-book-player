@@ -56,12 +56,16 @@ QueueHandle_t UI_MAIN_scanQueueIn=NULL;
 QueueSetHandle_t UI_MAIN_keysAndPlay=NULL;
 uint16_t UI_MAIN_amountOfBooks=0;
 uint16_t UI_MAIN_amountOfFiles=0;
-uint16_t UI_MAIN_sortedBookIDs[FF_MAX_SORT_ELEMENTS];
+uint16_t UI_MAIN_sortedBookIDs[FF_MAX_FOLDER_ELEMENTS];
 char UI_MAIN_selectedFolderName[FF_FILE_PATH_MAX];
 char UI_MAIN_selectedFileName[FF_FILE_PATH_MAX];
 uint16_t UI_MAIN_sortedFileIDs[FF_MAX_SORT_ELEMENTS];
 QueueHandle_t UI_MAIN_rotaryEventQueue;
 
+/**
+  * @brief clocks the CPU to maximum speed
+  *
+  */
 void UI_MAIN_cpuFull(){
     rtc_cpu_freq_config_t conf, cconf;
     rtc_clk_cpu_freq_get_config(&cconf);
@@ -72,6 +76,10 @@ void UI_MAIN_cpuFull(){
     }
 }
 
+/**
+  * @brief clocks the CPU to normal speed
+  *
+  */
 void UI_MAIN_cpuNormal(){
     rtc_cpu_freq_config_t conf, cconf;
     rtc_clk_cpu_freq_get_config(&cconf);
@@ -165,8 +173,11 @@ char UI_MAIN_filePath[FF_FILE_PATH_MAX];
 char* UI_MAIN_searchString=NULL;
 int32_t* UI_MAIN_searchId=NULL;
 uint8_t* UI_MAIN_searchFlags=NULL;
+char fileLine[255];
+char UI_MAIN_dirEntry[255];
 void UI_MAIN_scanSortTaskAllBooks(){
     UI_MAIN_cpuFull();
+    memset(&UI_MAIN_sortedBookIDs[0],0,sizeof(UI_MAIN_sortedBookIDs));
     FF_getList(SD_CARD_MOUNT_POINT,&UI_MAIN_amountOfBooks,&UI_MAIN_sortedBookIDs[0],0,&UI_MAIN_scanQueueOut,&UI_MAIN_scanQueueIn,UI_MAIN_searchString,UI_MAIN_searchId,UI_MAIN_searchFlags);
     UI_MAIN_cpuNormal();
     vTaskDelete(NULL);
@@ -174,6 +185,7 @@ void UI_MAIN_scanSortTaskAllBooks(){
 
 void UI_MAIN_scanSortTaskOneBook(){
     UI_MAIN_cpuFull();
+    memset(&UI_MAIN_sortedFileIDs[0],0,sizeof(UI_MAIN_sortedFileIDs));
     FF_getList(&UI_MAIN_folderPath[0],&UI_MAIN_amountOfFiles,&UI_MAIN_sortedFileIDs[0],1,&UI_MAIN_scanQueueOut,&UI_MAIN_scanQueueIn,UI_MAIN_searchString,UI_MAIN_searchId,UI_MAIN_searchFlags);
     UI_MAIN_cpuNormal();
     vTaskDelete(NULL);
@@ -208,6 +220,16 @@ void UI_MAIN_setWakeupTimer(uint64_t timer){
  uint64_t UI_MAIN_getWakeupTimer(){
     return UI_MAIN_wakeupTimer;
 }
+
+#define UI_MAIN_RUN_SM_INIT 0
+#define UI_MAIN_RUN_SM_FOLDER_SCAN 5
+#define UI_MAIN_RUN_SM_FOLDER_SELECTION 10
+#define UI_MAIN_RUN_SM_WAKEUP_TIMER_SETUP 12
+#define UI_MAIN_RUN_SM_BOOK_SCAN 15 
+#define UI_MAIN_RUN_SM_PAUSED 20
+#define UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP 22
+#define UI_MAIN_RUN_SM_PLAY_INIT 24
+#define UI_MAIN_RUN_SM_PLAYING 25
 
 #define UI_MAIN_DEFAULT_SLEEP_TIME_S 300
 SAVES_saveState_t UI_MAIN_saveState;
@@ -293,7 +315,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                 case 0: saveFlag=1;sleepOffSM=1;
                         break;
                 case 1:
-                        SCREENS_switchingOff();
+                        SCREENS_switchingOff(SD_CARD_getSize(),SAVES_getUsedSpaceLevel());
                         UI_MAIN_sdPlayMsgSend.msgType=SD_PLAY_MSG_TYPE_STOP_PLAY;
                         SD_PLAY_sendMessage(&UI_MAIN_sdPlayMsgSend,100);
                         for(uint16_t i=0;i<300;i++){//300*10ms=3s
@@ -305,13 +327,16 @@ char UI_MAIN_pcWriteBuffer[2048];
             }
         }
         switch(mainSM){
-            case 0: if(SD_CARD_init()==0){
+            case UI_MAIN_RUN_SM_INIT:
+                    if(SD_CARD_init()==0){
                         UI_MAIN_fwUpgradeRun();
-                        mainSM=5;
+                        mainSM=UI_MAIN_RUN_SM_FOLDER_SCAN;
                         UI_MAIN_searchFlags=NULL;
                         UI_MAIN_searchId=NULL;
                         UI_MAIN_searchString=NULL;
-                        SAVES_cleanOldBookmarks();
+                        if(SAVES_getUsedSpaceLevel()>=75){
+                            SAVES_cleanOldBookmarks();
+                        }
                         if(SAVES_loadSettings(&UI_MAIN_settings)==0){
                             UI_MAIN_volume=UI_MAIN_settings.volume;
                             if(UI_MAIN_settings.sleepTimeSetupS<60){
@@ -330,7 +355,8 @@ char UI_MAIN_pcWriteBuffer[2048];
                         return; // returning to main means deep sleep
                     }
                     break;
-            case 5: if(xQueueReceive(UI_MAIN_scanQueueOut,&scanMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming scan messages
+            case UI_MAIN_RUN_SM_FOLDER_SCAN: 
+                    if(xQueueReceive(UI_MAIN_scanQueueOut,&scanMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming scan messages
                         if(scanMessage==-1){//finished ok
                             if(UI_MAIN_amountOfBooks==0){//show empty folder symbol
                                 SCREENS_noFolders();
@@ -341,7 +367,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 selectedFolder=1;
                                 UI_MAIN_selectedFolderName[0]=0;
                                 UI_MAIN_selectedFileName[0]=0;
-                                mainSM=10;
+                                mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                                 if(searchId>=0){//did we search for a folder that was last listened and found one?
                                     selectedFolder=searchId+1;
                                     strcpy(&UI_MAIN_selectedFolderName[0],&UI_MAIN_settings.lastFolderName[0]);
@@ -355,21 +381,21 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 searchId=-1;
                             }
                         }else if(scanMessage==-4){//scan canceled
-                            mainSM=0;
+                            mainSM=UI_MAIN_RUN_SM_INIT;
                         }else if(scanMessage>=0){
                             UI_MAIN_offTimestamp=esp_timer_get_time();
                             SCREENS_scanAllBooks(scanMessage);
                         }else{//some kind of error
-                            mainSM=0;
+                            mainSM=UI_MAIN_RUN_SM_INIT;
                         }
                     }
                     break;
-            case 10: //folder selection screen
+            case UI_MAIN_RUN_SM_FOLDER_SELECTION:
                     if(FF_getNameByID(SD_CARD_MOUNT_POINT,UI_MAIN_sortedBookIDs[selectedFolder-1],&UI_MAIN_selectedFolderName[0],0)!=0){
-                        mainSM=0;
+                        mainSM=UI_MAIN_RUN_SM_INIT;
                     }
                     SCREENS_folderSelect(selectedFolder,UI_MAIN_amountOfBooks,&UI_MAIN_selectedFolderName[0],UI_MAIN_getWakeupTimer());
-                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(20)) == pdPASS ){//wait for incoming key messages
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(50)) == pdPASS ){//wait for incoming key messages
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(selectedFolder>1){
                                 selectedFolder--;
@@ -397,11 +423,11 @@ char UI_MAIN_pcWriteBuffer[2048];
                             }
 
                             xTaskCreate(UI_MAIN_scanSortTaskOneBook, "UI_MAIN_scanSortTaskOneBook", 1024 * 5, NULL,  uxTaskPriorityGet(NULL), NULL);
-                            mainSM=15;
+                            mainSM=UI_MAIN_RUN_SM_BOOK_SCAN;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                            mainSM=12;
+                            mainSM=UI_MAIN_RUN_SM_WAKEUP_TIMER_SETUP;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){//TODO: go to a settings screen/setup, switch off for now
-                            SCREENS_switchingOff();
+                            SCREENS_switchingOff(SD_CARD_getSize(),SAVES_getUsedSpaceLevel());
                             if(UI_MAIN_isImagePersisted()==0){
                                 UI_MAIN_persistImage();
                             }
@@ -410,7 +436,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                         }
                     }
                     break;
-            case 12: //wakeup timer selection screen
+            case UI_MAIN_RUN_SM_WAKEUP_TIMER_SETUP:
                     SCREENS_wakeupTimer(wakeupTimeSetupS);
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
@@ -439,21 +465,21 @@ char UI_MAIN_pcWriteBuffer[2048];
                             lastMinuteChangedTime=now;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
                             UI_MAIN_setWakeupTimer(wakeupTimeSetupS);
-                            mainSM=10;
+                            mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                             UI_MAIN_setWakeupTimer(0);
-                            mainSM=10;
+                            mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
                             UI_MAIN_setWakeupTimer(0);
-                            mainSM=10;
+                            mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                         }
                     }
                     break;                    
-            case 15:
+            case UI_MAIN_RUN_SM_BOOK_SCAN:
                     if(xQueueReceive(UI_MAIN_scanQueueOut,&scanMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming scan messages
                         if(scanMessage==-1){//finished ok
                             if(UI_MAIN_amountOfFiles==0){//no files found, go back to folder selection
-                                mainSM=10;
+                                mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                             }else{
                                 pauseMode=0;//default chapter selection for a newly selected book
                                 selectedFile=1;
@@ -468,7 +494,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 currentPlayChannels=0;
                                 currentPlayBitrate=0;
                                 newPlayMinute=0;
-                                mainSM=20;
+                                mainSM=UI_MAIN_RUN_SM_PAUSED;
                                 if(searchId>=0){//did we search for a filename that was last listened and found one?
                                     strcpy(&UI_MAIN_selectedFileName[0],&UI_MAIN_saveState.fileName[0]);
                                     selectedFile=searchId+1;
@@ -488,12 +514,12 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 searchId=-1;
                             }
                         }else if(scanMessage==-4){//scan canceled
-                            mainSM=10;
+                            mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                         }else if(scanMessage>=0){
                             UI_MAIN_offTimestamp=esp_timer_get_time();
                             SCREENS_scanOneBook(scanMessage);
                         }else{//some kind of error
-                            mainSM=10;
+                            mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                         }
                     }
                     if(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,0) == pdPASS ){//wait for incoming key messages
@@ -503,7 +529,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                         }
                     }
                     break;
-            case 20://pause screen 
+            case UI_MAIN_RUN_SM_PAUSED:
                     if(pauseMode==0){//with chapter selection
                         FORMAT_HELPER_getPlayTimeByExtension(&currentPlaySecond,&currentPlayMinute,&percent,&UI_MAIN_selectedFileName[0],currentPlayPosition,currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,&allPlaySecond,&allPlayMinute,currentPlayChannels);
                         SCREENS_pause0(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],currentPlayMinute,currentPlaySecond,percent,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
@@ -516,7 +542,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                     if((searchFlags&FF_AUTOSTART_FLAG)||(startUpFlags&UI_MAIN_STARTUPFLAG_RTC)){
                         searchFlags&=~FF_AUTOSTART_FLAG;//autostart only once for an enterd folder
                         startUpFlags&=~UI_MAIN_STARTUPFLAG_RTC;
-                        mainSM=24;
+                        mainSM=UI_MAIN_RUN_SM_PLAY_INIT;
                     }
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
                         if(pauseMode==0){//with chapter selection
@@ -533,7 +559,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                     selectedFile=1;
                                 }
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
-                                mainSM=24;
+                                mainSM=UI_MAIN_RUN_SM_PLAY_INIT;
                                 if(oldSelectedFile!=selectedFile){
                                     currentPlayMinute=0;
                                     currentPlaySecond=0;
@@ -541,9 +567,9 @@ char UI_MAIN_pcWriteBuffer[2048];
                                     oldSelectedFile=selectedFile;
                                 }
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
-                                mainSM=10;
+                                mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                                mainSM=22;
+                                mainSM=UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP;
                             }
                         }else if(pauseMode==1){//with time selection
                             if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
@@ -577,17 +603,17 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 }
                                 lastMinuteChangedTime=now;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
-                                mainSM=24;
+                                mainSM=UI_MAIN_RUN_SM_PLAY_INIT;
                                 currentPlayMinute=newPlayMinute;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
-                                mainSM=10;
+                                mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                                mainSM=22;
+                                mainSM=UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP;
                             }
                         }
                     }
                     break;
-            case 22://sleep timer screen
+            case UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP:
                     SCREENS_sleepTimer(sleepTimeSetupS);
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
@@ -604,17 +630,17 @@ char UI_MAIN_pcWriteBuffer[2048];
                             }
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
                             sleepTimeOffTime=esp_timer_get_time()+(sleepTimeSetupS*1000000);
-                            mainSM=20;
+                            mainSM=UI_MAIN_RUN_SM_PAUSED;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                             sleepTimeOffTime=0;
-                            mainSM=20;
+                            mainSM=UI_MAIN_RUN_SM_PAUSED;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
                             sleepTimeOffTime=0;
-                            mainSM=20;
+                            mainSM=UI_MAIN_RUN_SM_PAUSED;
                         }
                     }
                     break;
-            case 24: //preparing for playing
+            case UI_MAIN_RUN_SM_PLAY_INIT:
                     if(FF_getNameByID(&UI_MAIN_folderPath[0],UI_MAIN_sortedFileIDs[selectedFile-1],&UI_MAIN_selectedFileName[0],1)==0){
                         strcpy(&UI_MAIN_filePath[0],&UI_MAIN_folderPath[0]);
                         strcat(&UI_MAIN_filePath[0],"/");
@@ -630,16 +656,16 @@ char UI_MAIN_pcWriteBuffer[2048];
                         lastSdPlayMessage=esp_timer_get_time();
                         allPlayMinute=0;
                         allPlaySecond=0;
-                        mainSM=25;
+                        mainSM=UI_MAIN_RUN_SM_PLAYING;
                     }else{//something went wrong
-                        mainSM=10;
+                        mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                     }
                     pauseMode=0;
                     saveFlag=0;
                     xQueueAddToSet(UI_MAIN_keyQueue,UI_MAIN_keysAndPlay);
                     xQueueAddToSet(playerQueue,UI_MAIN_keysAndPlay);
                     break;
-            case 25://play screen
+            case UI_MAIN_RUN_SM_PLAYING:
                     if(!UI_ELEMENTS_isDisplayOff()){
                         if(((now-lastVolumeChangedTime)/1000)<1000){
                             SCREENS_volumeChange(UI_MAIN_volume);
@@ -667,23 +693,23 @@ char UI_MAIN_pcWriteBuffer[2048];
                                     currentPlayBitrate=0;
                                     currentPlayChannels=0;
                                     selectedFile++;
-                                    mainSM=24;
+                                    mainSM=UI_MAIN_RUN_SM_PLAY_INIT;
                                     if(selectedFile>UI_MAIN_amountOfFiles){//book finished, reset everything to start
                                         selectedFile=1;
                                         if(searchFlags&FF_REPEAT_FLAG){
-                                            mainSM=24;//go on if we should repeat
+                                            mainSM=UI_MAIN_RUN_SM_PLAY_INIT;//go on if we should repeat
                                         }else{
-                                            mainSM=20;
+                                            mainSM=UI_MAIN_RUN_SM_PAUSED;
                                         }
                                     }
                                     oldSelectedFile=selectedFile;
                                 }else{//user pressed pause
-                                    mainSM=20;
+                                    mainSM=UI_MAIN_RUN_SM_PAUSED;
                                     saveFlag=1;
                                 }
                             }else if(UI_MAIN_sdPlayMsgRecv.msgType==SD_PLAY_MSG_TYPE_STOPPED_ERROR){
                                 ESP_LOGI(UI_MAIN_LOG_TAG,"ERROR");
-                                mainSM=20;
+                                mainSM=UI_MAIN_RUN_SM_PAUSED;
                             }else if(UI_MAIN_sdPlayMsgRecv.msgType == SD_PLAY_MSG_TYPE_FILEPOS_STATE){
                                 currentPlayPosition=UI_MAIN_sdPlayMsgRecv.filePos;
                                 currentPlaySize=UI_MAIN_sdPlayMsgRecv.fileSize;
@@ -696,7 +722,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 newPlayMinute=currentPlayMinute;
                                 if(((esp_timer_get_time()-lastAutoSave)/1000000)>30){
                                     //saveFlag=1;
-                                    vTaskGetRunTimeStats(&UI_MAIN_pcWriteBuffer[0]);ESP_LOGI(UI_MAIN_LOG_TAG,"%s",&UI_MAIN_pcWriteBuffer[0]);
+                                    vTaskGetRunTimeStats(&UI_MAIN_pcWriteBuffer[0]);ESP_LOGI(UI_MAIN_LOG_TAG,"\n%s",&UI_MAIN_pcWriteBuffer[0]);
                                     ESP_LOGI(UI_MAIN_LOG_TAG,"Heap free: %lu, mininmum free: %lu",esp_get_free_heap_size(),esp_get_minimum_free_heap_size());
                                     lastAutoSave=esp_timer_get_time();
                                 }
@@ -744,7 +770,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                     }
                     if((now-lastSdPlayMessage)/1000000>2){//2s no message from sd play
                         ESP_LOGE(UI_MAIN_LOG_TAG,"PLAYTIMEOUT");
-                        mainSM=20;
+                        mainSM=UI_MAIN_RUN_SM_PAUSED;
                     }
                     if(saveFlag){
                         ESP_LOGI(UI_MAIN_LOG_TAG,"Saving playposition.");
@@ -774,7 +800,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                         strcpy(&UI_MAIN_settings.lastFolderName[0],&UI_MAIN_selectedFolderName[0]);
                         SAVES_saveSettings(&UI_MAIN_settings);
                     }
-                    if(mainSM!=25){
+                    if(mainSM!=UI_MAIN_RUN_SM_PLAYING){
                         xQueueRemoveFromSet(UI_MAIN_keyQueue,UI_MAIN_keysAndPlay);
                         xQueueRemoveFromSet(playerQueue,UI_MAIN_keysAndPlay);
                     }
@@ -1016,7 +1042,7 @@ void UI_MAIN_init(){
     UI_MAIN_scanQueueOut=xQueueCreate(1, sizeof(int32_t));
     UI_MAIN_scanQueueIn=xQueueCreate(1, sizeof(int32_t));
     UI_MAIN_keysAndPlay = xQueueCreateSet(100);
-    vTaskDelay(pdMS_TO_TICKS(1000));//let the rotary encoder get first valid values
+    vTaskDelay(pdMS_TO_TICKS(1000));//let the rotary encoder get first valid values and to let the user see the init screen
     uint8_t cnt=0;
     do{
         if(rotary_encoder_switch_state()){

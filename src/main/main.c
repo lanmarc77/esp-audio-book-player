@@ -13,6 +13,10 @@
 */
 
 //ffmpeg -i input.m4a -c:a copy -movflags +faststart output.m4a
+
+/** Generating a working pre sorted folder index on root of sd card:
+  * find * -type d -print |sort | iconv -t 437 > presorted.txt
+  */ 
 #include <string.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
@@ -47,7 +51,7 @@ void MAIN_deep_sleep(){
             ESP_LOGE(MAIN_LOG_TAG,"Timerwakeup setup ERROR %llu",1000000ull*UI_MAIN_getWakeupTimer());
         }
     }
-    vTaskDelay(20);
+    vTaskDelay(pdTICKS_TO_MS(10));//leave some time for the pulldowns to stabilize the voltage
     esp_deep_sleep_start();
 }
 //displays stack sizes of freertos on terminal
@@ -101,6 +105,8 @@ void app_main(void)
     uint32_t brownOutValue=READ_PERI_REG(RTC_CNTL_BROWN_OUT_REG);
     brownOutValue&=~RTC_CNTL_BROWN_OUT_ENA;//disable
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, brownOutValue);
+
+    SD_PLAY_init();
 
     //switch Vext pin on
     esp_rom_gpio_pad_select_gpio(36);

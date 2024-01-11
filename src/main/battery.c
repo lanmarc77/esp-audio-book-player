@@ -25,12 +25,13 @@
 #include "driver/gpio.h"
 
 #define BATTERY_LOG_TAG "BAT"
-uint32_t BATTERY_current=0;
-uint32_t BATTERY_currentStable=0;
+uint32_t BATTERY_current=0; //contains the first 10s a fast filtered battery voltage, slow afterwords
+uint32_t BATTERY_currentStable=0; //keeps an only slow filtered battery voltage
 static int BATTERY_adc_raw[2][10];
 
 static bool BATTERY_adc_calibration_init(adc_unit_t unit, adc_channel_t channel, adc_atten_t atten, adc_cali_handle_t *out_handle)
 {
+    //all of the following is mainly taken from the SDK ADC examples
     adc_cali_handle_t handle = NULL;
     esp_err_t ret = ESP_FAIL;
     bool calibrated = false;
@@ -77,6 +78,7 @@ static bool BATTERY_adc_calibration_init(adc_unit_t unit, adc_channel_t channel,
     return calibrated;
 }
 
+//an ADC one shot based task that handles ADC battery voltage aquisition every 500ms
 void BATTERY_battVoltageTask(){
     esp_rom_gpio_pad_select_gpio(37);
     gpio_set_direction(37, GPIO_MODE_OUTPUT);
@@ -136,6 +138,8 @@ void BATTERY_battVoltageTask(){
 /**
   * @brief   returns the current battery voltage in mV, the first 10s this value is
   *          using a very fast and responsive filter afterwords a slow but steady filter
+  *          used during program startup to get the first battery voltages fast to know
+  *          if it is too low and the system needs to be switched off
   * 
   * @return  filtered battery voltage in mV
   */
@@ -155,6 +159,7 @@ uint32_t BATTERY_getCurrentVoltageStable(){
 
 /**
   * @brief    call once at program start to initalize the component
+  *           starts a task to continuously measure the battery voltage
   */
 void BATTERY_init(){
     xTaskCreate(BATTERY_battVoltageTask, "BATTERY_battVoltageTask", 1024 * 5, NULL, uxTaskPriorityGet(NULL), NULL);

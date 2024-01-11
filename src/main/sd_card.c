@@ -28,6 +28,16 @@ const char SD_CARD_mount_point[] = SD_CARD_MOUNT_POINT;
 sdmmc_card_t *SD_CARD_card;
 
 /**
+  * @brief get the raw size of the inserted SD card
+  *
+  * @return size in MB
+  * 
+  */
+uint64_t SD_CARD_getSize(){
+    return ((uint64_t) SD_CARD_card->csd.capacity) * SD_CARD_card->csd.sector_size / (1024 * 1024);
+}
+
+/**
   * @brief initializes and mounts the SD card into the VFS
   *
   * @return 0=ok, SD card mounted, 1=error, SD card not mounted
@@ -134,7 +144,7 @@ uint8_t SD_CARD_init(){
     ESP_LOGI(SD_CARD_LOG_TAG, "Filesystem mounted");
 
     // Card has been initialized, print its properties
-    sdmmc_card_print_info(stdout, SD_CARD_card);
+    //sdmmc_card_print_info(stdout, SD_CARD_card);
 
     SD_CARD_sdState=2;
     return 0;

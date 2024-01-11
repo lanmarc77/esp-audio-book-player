@@ -30,5 +30,7 @@ uint8_t UI_MAIN_isImagePersisted();
 void UI_MAIN_persistImage();
 void UI_MAIN_fwUpgradeRun();
 uint64_t UI_MAIN_getWakeupTimer();
+void UI_MAIN_cpuFull();
+void UI_MAIN_cpuNormal();
 
 #endif
