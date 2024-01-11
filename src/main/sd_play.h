@@ -28,6 +28,8 @@
 #define SD_PLAY_MSG_TYPE_STOPPED_ERROR 4
 #define SD_PLAY_MSG_TYPE_FILEPOS_STATE 5
 
+//using a HW mute pin on PCM5102 or UDA1334a did not change the
+//pop behavior when I²S is reconfigured, so no need to use at the moment
 //#define SD_PLAY_HW_MUTE_PIN -1
 
 typedef struct {
