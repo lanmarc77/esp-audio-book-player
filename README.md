@@ -1,21 +1,22 @@
-# An ESP32 based audio book player build from existing electronics modules
-**THIS REPO IS WIP. FILES/INFORMATION ARE ADDED STEP BY STEP**
-
-A device that is meant to play non-DRM audio books from an SD card and has the following features:  
+# TINAMP: An ESP32 based audio book player build from existing electronics modules
+TINAMP: **T**his **I**s **N**ot **A** **M**usic **P**layer.  
+  
+This is a device that is meant to play non-DRM audio books from an SD card and has the following features:  
 
 - folder based audio book player, one folder contains all files of one audio book
-- multiple audio books supported
+- multiple audio books supported (currently max. 9999 on one SD card)
 - sorting of audio book names and audio book files by ASCII name (see limitations of sorting below)
 - saves audio book listening position and resumes for each audio book
 - supports huge single file audio books, e.g. a 20hrs long singe file audio book
 - file formats AMR-WB, MP3 and OGG
 - ASCII character based menu driven UI for 16x4 character screen
-- single rotary knob navigation
+- single rotary encoder navigation
 - sleep timer 1...99min, wakeup timer 1min...24hr
 - auto power off
 - firmware upgrades from SD card
 - based on pure esp-idf + esp-adf
 - plays 50hrs+ with 2500mAh 18650 battery
+- charging via USB-C
 - endless options of integrations with speakers/cases
   
 It tries to follow the design principle of
@@ -38,8 +39,8 @@ Currently (2023) one really needs to search hard to find an offline only non tra
 able to play files from huge SD cards and at the same time sorts the files based on their name and remembers and
 resumes the last listening position.  
 Many people nowadays will use subscription services with corresponding apps on their smartphone. These services
-and the apps usually track the users. The can also be canceled at any time. May it be for politics or economic
-reasons. They usually do not allow you own the audio book but only sell a license to listen at it for as long
+and the apps usually track the users. They can also be canceled at any time. May it be for politics or economic
+reasons. They usually do not allow you to own the audio book but only sell a license to listen at it for as long
 as the company exists or is allowed to do business with you.  
 I have an audio book collection that I created by only buying if I can download the files or
 copy them e.g. from a CD to keep them. Without DRM.  
@@ -80,7 +81,9 @@ battery cable.
 Typical price in Germany incl. tax (2023): 20€. 
   
 **I²S digital analog audio converter**  
-Currently only a MAX98357A based converter has been tested extensively. Also an UDA1334A was tested and it worked.
+Currently only a MAX98357A based converter has been tested extensively. Also an UDA1334A and PCM5102 were
+tested and they worked. Both of these stereo DACs needed around 10-15mA more current which will reduce the system
+runtime.
 The MAX98357A already contains an amplifier to directly connect it to a speaker and get a usable volume out
 of it.  
 ![image](pictures/MAX98357A.jpg)  
@@ -100,8 +103,8 @@ there are many cheap fake batteries.
 ![image](pictures/battery_and_holder.jpg)  
 Typical price in Germany for both incl. tax (2023): 8€. 
   
-**Rotary knob**  
-To minimize wiring and drilling work I decided for a single rotary knob as main navigation option. This model
+**Rotary encoder**  
+To minimize wiring and drilling work I decided for a single rotary encoder as main navigation option. This model
 has an integrated switch. I suggest to buy a version that comes with the washer/nut/cap.  
 ![image](pictures/knob.png)  
 Typical price in Germany incl. tax (2023): 1€. 
@@ -126,10 +129,11 @@ These PCBs have headers for the components. You can leave these out but then nee
 which order you solder the wires as you might not get to them anymore.   
   
 ## Buyable manufactured PCB
-TODO: One or tow PCB layouts as motherboard for a 3D printed base case and a worldwide buyable case.  
+WIP: One or two PCB layouts as motherboard for a 3D printed base case and a worldwide buyable case.  
   
 ## Printed/buyable case
-TODO: 3D case model and worldwide buyable model  
+WIP: 3D case model  
+TODO: worldwide buyable model  
   
 ## Current measurements / battery life
 The runtime of the system is highly dependent on the current consumption. The current consumption depends on the
@@ -169,8 +173,335 @@ The volume setting actually follows an x⁴ curve for translating % into power t
   
 An 18650 battery with 2500mAh will most certainly hold 50hrs assuming average volume levels between 50%...75%.  
   
-# UI navigation / usage manual
-TODO
+# UI and player navigation
+The following sub chapters explain the states of the player and the different menus or screens the player shows.  
+You might want to watch the videos above for a shorter introduction.  
+  
+## The rotary encoder
+The only input device is a rotary encoder with a button. It currently supports the following actions:  
+
+- rotation for number, time and volume selections, speed of rotation in most menus increases the step size of the setup unit
+- short click usually used for ok
+- long click usually used as cancel or back
+- double click activates sub or special functions
+
+## The players state machine
+Legend:  
+SC=short click  
+LC=long click  
+DC=double click  
+AC=any type of click  
+  
+```
+            powered off
+                |
+                | AC
+                |                                              pressed long
+                v       button still pressed?                    enough?   
+            init screen ---------------------> reset countdown ---------- 
+                |                                 screen                 |
+                |                                    | button            |
+                |                                    | released     reset screen
+                |                                    |          +delete all bookmarks
+                |                                    |            and user settings
+                |                                    |                   |
+                |                                    v                   |
+                |<-------------------------------------------------------
+                |
+                | no sd card found?                      3s
+                |--------------------> no sd card screen ---> power off
+                |
+                | new fw upgrade found?           SC                      10s
+                |------------------> upgrade init ----> upgrade countdown --
+                |                      screen              screen           |
+                |                        |                  |               |
+                |                        | any other        | AC         upgrade
+                |                        | click            |            progress
+                |                        | or no click      |            screen
+                |                        v after 3s         v               |
+                |<------------------------------------------                | ~10s
+                |                                                           |
+                |                                                           v
+                |                                                         reboot
+                |
+                | ~2s
+                v           0 folders?                               3s
+          audio book scan -------------> no audio books found screen ---> power off
+              screen
+                | ~?s
+                | scan time depends on number of audio books
+                |
+                v                    LC                                  3s
+   ---> audio book selection screen ----> persist new fw ---> off screen ---> power off
+  |     |     |       ^    ^      ^         if needed
+  |     | DC  |SC     |    |      |
+  |     |     |       |    |      |
+  |     |     |       |    |      |
+  |     |     |       |    |      |
+  |     |     |       |     ----   -
+  |     |     |       | AC      |   |
+  |     |     v       |         |   |
+  |     |    audio book content |   |
+  |     |    |   scan screen    |   |<-------------------------
+  |     |    |    |             |   |                          |
+  |     |    |    | 0 files     |   |                          |
+  |     |    |    | found?      |   |                          |
+  |     |    |    |             |   |                          |
+  |     |    |     -------------    |    volume change         |
+  |     |    |                      |    screen                |
+  |     |    | scan      -----------     |1s  ^                |
+  |     |    | finished |                |    |                |
+  |     |    |          | LC             |    |rotate          | LC
+  |     |    v          |    SC          v    |   SC           |
+  |     |    pause screen  -----------> playing ------------> pause screen
+  |     |    with chapter  <----------  screen <------         with time
+  |     |     selection            LC     |           |        selection
+  |     |        |                        | DC        |            |
+  |     |        | DC                     |        play next       | DC
+  |     |        |                         -------> chapter        |
+  |     |        |                                                 |
+  |     |         ------------------------------------------------>|
+  |     |                                                          |
+  |     v                                                          v
+  |  sleep timer                                              wakeup timer
+  |  setup screen                                             setup screen
+  |  |           |                                            |           |
+  |  | SC        | any other click                            | SC        | any other click
+  |  | activate  | timer not                                  | activate  | timer not
+  |  | timer     | activated                                  | timer     | activated
+  |<-            |                                            |           |
+  |              |                                             ----- -----
+   --------------                                                   |
+                                                                    v
+                                                           back to corresponding
+                                                               pause screen
+
+```
+
+After 30s of no click the screen turns off. If the player is not playing and the screen was off for an additional
+30s then the player powers off.  
+If the screen is off any click will first turn the screen on. An additional click is needed for the
+desired action. There is one exception: the double click in the play screen to skip to the next
+chapter works right away even if the screen is off.  
+If the battery level drops below 3.35V the low battery screen is shown and the player powers off.  
+  
+## The menus
+All menus are built upon the basic ASCII set. This should allow changing the display easily.  
+If something can be setup using rotation usually that element flashes.  
+  
+### Init screen
+```
+ ----------------
+|                |
+|     (o_o)      |
+|       ok       |
+|   v00.00.05    |
+ ----------------
+```
+Shows the firmware version number. If ok is displayed the firmware is persisted. If TEST is displayed
+the firmware is not persisted and if the player powers off automatically the old firmware is reinstalled.  
+  
+### Reset countdown screen
+```
+ ----------------
+|                |
+|     (o o)      |
+|       O        |
+|[=========-    ]|
+ ----------------
+```
+If the button is hold down until the progress at the bottom has counted down the player
+will delete all bookmarks and reset all user settings to default values.  
+  
+### Reset screen
+```
+ ----------------
+|0000000000000000|
+|0000000000000000|
+|0000000000000000|
+|0000000000000000|
+ ----------------
+```
+Shown until the reset procedure is finished.  
+  
+### Upgrade init screen
+```
+ ----------------
+| ||    00.00.04 |
+|-  -     vvv    |
+|-  -      ?     |
+| ||    00.00.05 |
+ ----------------
+```
+Shows the currently installed firmware and the new version that can be installed.  
+  
+### Upgrade countdown screen
+```
+ ----------------
+| ||    00.00.04 |
+|-  -     vvv    |
+|-  -     5s     |
+| ||    00.00.05 |
+ ----------------
+```
+A countdown counts down to signal the upgrade will be started.  
+  
+### Upgrade screen
+```
+ ----------------
+|       ||       |
+|    -  34% -    |
+|    -      -    |
+|       ||       |
+ ----------------
+```
+Progress is shown during the running upgrade procedure.  
+  
+### No SD card screen
+```
+ ----------------
+|    -------     |
+|   | SD ?  |    |
+|   |______/     |
+|                |
+ ----------------
+```
+This screen is also shown if the SD card is removed while the player is active.  
+  
+### Audio book scan screen
+```
+ ----------------
+|     |---|      |
+|     | ? |      |
+|     |---|      |
+|[===    .      ]|
+ ----------------
+```
+The progress bar at the bottom shows the progress of the scan an sorting process.  
+  
+### No audio books found screen
+```
+ ----------------
+|     |---|      |
+|     | 0 |      |
+|     |---|      |
+|                |
+ ----------------
+```
+### Audio book selection screen
+```
+ ----------------
+|audio book name |
+| |------------| |
+| |     12/121 | |
+| |----00:01---| |
+ ----------------
+```
+Using rotation the different audio books can be selected. The screen shows selected 12 of 121 audio books.
+The audio book name at the top is essentially the name of the folder and scrolls through the screen if it is long.  
+The value 00:01 is only shown if the wake up timer has been setup and activated and shows the setup value.  
+  
+### Audio book content scan screen
+```
+ ----------------
+| |------------| |
+| |  A <==> B  | |
+| |------------| |
+|[=====- .      ]|
+ ----------------
+```
+The progress bar at the bottom shows the progress of the scan and sorting process and A and B are animated.  
+  
+### Pause screen
+```
+ ----------------
+|audio book name |
+|      3/12 3m  8|
+|     12:22 |>  9|
+|[===-   .      ]|
+ ----------------
+```
+The audio book name at the top is essentially the name of the folder and scrolls through the screen if it is long.  
+3/12 shows the currently selected chapter (=file) of this audio book and the number of all chapters.  
+12:22 is the current time within the currently selected chapter.  
+Depending on the mode either the time or the chapter flashes meaning this can be changed (seek or skip) using rotation.  
+The value 3m is only displayed if a sleep timer was setup and activated and shows the time left until the player will power off.  
+The progress bar at the bottom shows the progress within the current chapter.  
+On right side the battery level in percent is shown.  
+    
+### Playing screen
+```
+ ----------------
+|audio book name |
+|      3/12 3m  8|
+|     12:22 ||  9|
+|[===-   .      ]|
+ ----------------
+```
+The audio book name at the top is essentially the name of the folder and scrolls through the screen if it is long.  
+3/12 shows the currently selected chapter (=file) of this audio book and the number of all chapters.  
+12:22 is the current time within the currently selected chapter.  
+The time is switching repeatedly between current time position and time left.  
+The value 3m is only displayed if a sleep timer was setup and activated and shows the time left until the player will power off.  
+The progress bar at the bottom shows the progress within the current chapter.  
+On right side the battery level in percent is shown.  
+  
+### Volume change screen
+```
+ ----------------
+|################|
+|################|
+|##              |
+|      5100      |
+ ----------------
+```
+The # characters are a visual representation of the setup volume. Volume level ranges from 0...10000. 7500 actually
+marks 100% audio volume of the source everything above this will add a gain of up to 25% to the source volume level.  
+  
+### Sleep timer setup screen
+```
+ ----------------
+|                |
+|    (-_-)Zzz    |
+|      1/99      |
+|                |
+ ----------------
+```
+Using rotation the sleep timer can be setup from 1 minute to 99 minutes in minute precision.  
+  
+### Wake up timer setup screen
+```
+ ----------------
+|                |
+|(-_-)  ->  (o_o)|
+|                |
+|      01:00     |
+ ----------------
+```
+Using rotation the sleep timer can be setup from 1 minute to to 24 hours in minute precision.  
+  
+### Low battery screen
+```
+ ----------------
+|      _--_      |
+|     |    |     |
+|     |    |    6|
+|     |####|     |
+ ----------------
+```
+On right side the battery level in percent is shown.  
+  
+### Off screen
+```
+ ----------------
+|                |
+|    (-_-)Zzz    |
+|    241160MB    |
+|       2%       |
+ ----------------
+```
+Also shows the size of the detected SD card and the used space of the bookmark storage in the SPIFFS
+of the ESP32.  
   
 # Uploading initial binary release
 For a brand new main controller board an initial upload is needed. This initial upload will setup the correct
@@ -214,15 +545,15 @@ XX are letters from A-F or/and numbers from 0-9 specifying the firmware version 
 Place the file on the SD card in a folder called `fwupgrade`. Once you start the device it should
 present you with the upgrade screen. The upgrade screen is left without upgrading if no user interaction is
 happening for 10s.  
-If you wish to upgrade shortly press the knob button. A countdown of 10s gives you the possibility
-to stop the upgrade if you press the knob button. Once the upgrade started you can not interrupt it.
+If you wish to upgrade shortly press the encoder button. A countdown of 10s gives you the possibility
+to stop the upgrade if you press the encoder button. Once the upgrade started you can not interrupt it.
 The actual writing process for the upgrade takes around 10s and the progress is shown.  
   
 If everything worked you should now see the device restart with the new firmware version but it displays
 "TEST" instead of "ok" in the initial firmware version screen during startup.  
 "TEST" means that the new firmware is not yet persisted. In this test state you have the possibility
 to test everything and check if the new version suits your needs.  
-You can persist the new firmware by manually switching the device off by long pressing the knob button
+You can persist the new firmware by manually switching the device off by long pressing the encoder button
 in the audio book selection screen.  
 If you do not want to keep the new version and rollback you need to wait for the
 device to auto power off which usually happens after 1 minute with no user interaction. Once auto powered off and
@@ -336,7 +667,7 @@ This component initializes and monitors the AD converter for monitoring the batt
 There are two battery levels available. With slower noise filtering and with faster more noisy filtering.  
 A task samples the battery voltage every 500ms.  
   
-## screens.*, ui_elements.*, ssd1306*.*
+## screens.\*, ui_elements.\*, ssd1306\*.\*
 This collection of components uses a typical layered approach.  
 The ssd1306 functions give access to a physical display. Here the OLED of the board.  
 The ui_elements functions use the ssd306 functions to offer reusable UI elements like text output or
@@ -374,31 +705,98 @@ Filenames and global variables/functions match each others prefixes to easily be
 Prefixes are written in capital case and use _ as separator.  
 Apart from the prefixes variables and functions use camel case.  
   
-# Limitations/won't do's
-TODO
-
-- sorting, folders, files
-- bookmarks storage, number of bookmarks, manual bookmarks
-- m4b, drm
-- m3u/playlists
-- mp3/ogg chapter support
-- mp3/ogg cbr/vbr
-- file/folder charsets other than ascii
-- bluetooth audio (classic vs. LE audio)
-- playing speed
-- equalizer
-- upload on SD card not via ESP USB connector
+# Limitations, design decisions and behavior descriptions
+The following sub chapters explain a few design decisions, limitations and system behavior.  
   
-# Technical discussions
-TODO:
-
-- On the board the ESP32-S3 and it's alternative options
-- On sorting
-- On bookmark storage and cleanup
-- On MP3/OGG VBR/CBR
+## Sorting, limits of files/folders
+Sorting on a µC is hard. Sorting algorithms trade speed with memory and memory is something a µC usually does not have
+very much. It is impossible to keep a huge root directory in memory depending on the the character length of each
+entry. Especially if you want to be deterministic on how many entries you support.  
+This projects implementation has two options of displaying and playing sorted entries.  
+  
+### Sorting each time
+This is the default implementation. After startup when the list of all available audio books is read this list is sorted.
+Instead of keeping the strings/names of all entries in memory only their file allocation table position is used. This position
+acts as kind of ID of the entry. This ID is then sorted inside an array but not by its value but by its corresponding name.
+But this also means that the algorithm always has to translate between ID and name of the file resulting in an increased
+time of sorting. The algorithm used is a selection sort with a complexity of O(n²). But it is memory deterministic.  
+This allows keeping 1000 entries with only 2kB of memory usage. To wait for 1000 entries to be sorted is also
+still acceptable. Sorting speed is also determined by the way entries are named. As the C function strcmp is starting to compare
+at the beginning of a string the earlier a mismatch happens the earlier it can stop. It is beneficial to name files e.g.
+01... , 02... instead of ...01, ...02.  
+If a directory contains more than 1000 entries they are not taken into account.  
+This described sorting applies for audio books (directories) and their content (files).  
+  
+### Presorted list of root directory
+As I wanted the player to be able to also hold large collections of audio books 1000 entries in the root directory
+did not seem enough.  
+But sorting would take too long to be acceptable. Instead a presorted entry list can be created. Much like an .m3u file.  
+The file needs be called `presorted.txt` and must reside in the root directory of the SD card. It can contain 9999 lines
+where each line contains the directory name. The order in the file is the order in which they are displayed in
+the player.  
+The following command chain can be used in the root directory of the SD card to create such a sorted file:  
+  
+`find * -type d -print | sort | iconv -t 437 > presorted.txt`  
+  
+Names of entries must be in code page 437 format as this is the only one that is enabled in the ESP32. I did not wanted
+to make things more complicated by supporting all kinds of character encodings.  
+9999 entries=audio books with an average length of an audio book of 6hrs would take almost 55 years of listening if
+you listen every single day for 3hrs.  
+  
+Assuming AMR-WB file format with 24kbit/s the SD card would need to have ~618GB.  
+Assuming MP3 file format with 128kbit/s the SD card would need to have ~3.3TB.  
+  
+As the files within a directory/audio book are usually below 1000 the presorted.txt is not implemented for these.
+  
+## Bookmarks
+I decided to implement the bookmark storage inside the SPIFFS of the ESP32. I reserved 512kB for the SPIFFS. The
+storage could also have been the SD card and would have been the first choice. But that would mean writing to the
+SD card. The same card where the audio books are stored. I did not wanted to risk file system problems if one of those
+writes failed. Meaning a destroyed file system not being able to listen to audio books anymore. This project never
+writes to the SD card which in turn never can get corrupted.  
+Each bookmark is written when the player is paused or is powered off by one of the automatic methods like low battery
+or sleep timer. A bookmark is a file in the SPIFFS. The name of the file is an MD5 hash constructed from the directory
+name of the audio book. Inside the bookmark the listening position is stored and the file name that was currently played.  
+  
+Depending on the length of the file name bookmarks take more or less space in SPIFFS. On average 1kb can be assumed. This
+means around 500 bookmarks can be stored. Deleting individual bookmarks is not possible. But by using the reset procedure
+all bookmarks can be deleted. The off screen displays the usage of the SPIFFS in percent.  
+There is an automatic house keeping implemented. If the SPIFFS usage level is above 75% the SD card and the bookmarks are
+scanned. If there are bookmarks for which no fitting directory on the SD card exists this bookmark is deleted. This house
+keeping is based on the use case that SD cards are being swapped and around 500 audio books is the average on one of the
+SD cards.  
+  
+Manual bookmarks are not supported. Mainly because I personally never needed them but also because house keeping gets
+much more complicated as well as a method of jumping to different bookmarks inside the same audio book must be implemented.  
+  
+## CBR/VBR
+Only fully supported are CBR encoded files. The player also plays VBR files but the displayed timestamps might be wrong.
+Without scanning the full file or implementing code for the various VBR indexes there is no way to determine a correlation
+of file position and time.  
+The format handler functions take a look at the first frame of a file to determine the bitrate and therefore the frame length
+of a file.  
+  
+## Metadata
+No metadata of files is used. This includes chapter indexes, subtitles or cover pictures.  
+  
+## Bluetooth audio
+The used µC board uses the ESP32-S3. This newer model of the ESP32 does not support the so called classic Bluetooth
+audio stack which uses SBC as codec. It only supports the not yet widely used Bluetooth Audio LE. The esp-adf does
+not yet support a pipeline element that uses Bluetooth Audio LE. Once support is added and devices are getting more common
+I might implement support for it.  
+It might also be possible to make this project compile with the classic ESP32 that does support classic Bluetooth using SBC.
+But I do not plan for this as I use headphones with a jack and no extra battery I need to take care of.  
+  
+## Audio processing, equalizer, play speeds - Help needed
+I would like to implement functions for selecting different equalizer settings and also playing speeds.  
+My knowledge about audio processing was enough to implement a mono->stereo upmix function and volume settings but is
+not enough for more.  
+Simply increasing or decreasing the sample rate will result in not acceptable voice distortions.
+If anyone can help do not hesitate. All decoded 16-bit wide samples pass the function `SD_PLAY_volumeFilterProcess` in
+file `sd_play.c`.  
   
 # Ideas/future
-- multi user support
+- multi user support with individual bookmarks
 - audio navigation for handicapped people
 - printed PCB with fitting 3D printable case or fitting for a cheap buyable case
 

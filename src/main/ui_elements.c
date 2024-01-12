@@ -346,7 +346,11 @@ void UI_ELEMENTS_volume(int64_t volume){
     line[16]=0;
     for(i=0;i<sizeof(screen);i++){
         if(((16*4*volume)/10000)>i){
-            screen[i]='#';
+            if(i>=16*3){
+                screen[i]='+';
+            }else{
+                screen[i]='#';
+            }
         }else{
             screen[i]=' ';
         }
