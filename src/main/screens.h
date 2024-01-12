@@ -13,11 +13,15 @@
 */
 #ifndef SCREENS_H
 #define SCREENS_H
+/*
+    This component is an abstraction layer to represent screens to be displayed
+    as UI. It combines multiple UI elements to construct a full screen layout.
+*/
 #include <stdint.h>
 
 void SCREENS_noSdCard();
 void SCREENS_noFolders();
-void SCREENS_folderSelect(uint16_t selectedFolder,uint16_t amountOfFolders,char* folderName);
+void SCREENS_folderSelect(uint16_t selectedFolder,uint16_t amountOfFolders,char* folderName,uint64_t secondsTime);
 void SCREENS_scanAllBooks(int32_t deciPercent);
 void SCREENS_scanOneBook(int32_t deciPercent);
 void SCREENS_pause0(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint32_t batt,uint32_t sleepTimeSecondsLeft);
@@ -28,7 +32,8 @@ void SCREENS_volumeChange(int64_t volume);
 void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint8_t searchFlags,uint16_t allPlayMinute,uint8_t allPlaySecond,uint32_t batt,uint32_t sleepTimeSecondsLeft);
 void SCREENS_fwUpgradeInit(uint8_t major,uint8_t minor,uint8_t patch,int8_t timeout);
 void SCREENS_fwUpgradeRunning(int8_t percent);
-void SCREENS_switchingOff();
+void SCREENS_switchingOff(uint64_t sdSizeMB,uint8_t SPIFFSUsagePercent);
 void SCREENS_sleepTimer(uint32_t secondsLeft);
+void SCREENS_wakeupTimer(uint64_t secondsTime);
 
 #endif

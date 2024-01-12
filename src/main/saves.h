@@ -13,6 +13,11 @@
 */
 #ifndef SAVES_H
 #define SAVES_H
+/*
+    This component handles the storing and restoring of bookmarks
+    and the settings if the player itself e.g. volume
+    It also takes care of the SPIFFS handling
+*/
 #include <stdint.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -51,6 +56,6 @@ void SAVES_getBookmarkFileFromFolderName(char* folderName,char* saveFileName);
 uint8_t SAVES_existsBookmark(char* folderName,SAVES_saveState_t* save);
 uint8_t SAVES_saveBookmark(char* folderName,SAVES_saveState_t* save);
 void SAVES_cleanOldBookmarks();
-
+int32_t SAVES_getUsedSpaceLevel();
 
 #endif

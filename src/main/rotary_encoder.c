@@ -245,7 +245,7 @@ void rotary_encoder_debounce_switch(void * args){
             }else{
                 if((stable>=0)&&(stable<100)) stable++;
             }
-            if(stable>=2){
+            if(stable>=3){
                 if(lastButtonState==1){//button pressed
                     if(pressedHold==75){//hold long enough trigger long click but only once
                         //ESP_LOGI(TAG, "DEBOUNCE: LONG CLICK");

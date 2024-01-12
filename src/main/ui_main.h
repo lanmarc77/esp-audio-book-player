@@ -13,17 +13,24 @@
 */
 #ifndef UI_MAIN_H
 #define UI_MAIN_H
+/*
+    This component implements the main player logic on the highest level.
+
+*/
 #include <stdint.h>
 
+#define UI_MAIN_STARTUPFLAG_MANUAL 1
+#define UI_MAIN_STARTUPFLAG_RTC 2
+
 void UI_MAIN_init();
-
-//the main UI player logic
-void UI_MAIN_run();
-
+void UI_MAIN_run(uint8_t startUpFlags);
 void UI_MAIN_deInit();
 
 uint8_t UI_MAIN_isImagePersisted();
 void UI_MAIN_persistImage();
 void UI_MAIN_fwUpgradeRun();
+uint64_t UI_MAIN_getWakeupTimer();
+void UI_MAIN_cpuFull();
+void UI_MAIN_cpuNormal();
 
 #endif

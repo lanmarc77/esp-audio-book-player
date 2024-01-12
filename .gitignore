@@ -36,3 +36,9 @@ src/.vscode/
 
 #esp build directory
 src/build/
+src/sdkconfig.old
+
+#kicad
+pcb/**/*.zip
+pcb/**/*-bak
+pcb/**/*.bak

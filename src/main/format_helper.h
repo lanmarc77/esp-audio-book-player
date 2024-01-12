@@ -13,6 +13,11 @@
 */
 #ifndef FORMAT_HELPER_H
 #define FORMAT_HELPER_H
+/*
+    This component helps in analyzing audio file formats to determine the
+    important setup values to configure asp-adf pipeline correctly from the start
+    and to determine file sizes and playpositions based on file position
+*/
 #include <stdint.h>
 
 uint64_t FORMAT_HELPER_getFilePosByPlayTimeAndExtension(uint8_t currentPlaySecond,uint16_t currentPlayMinute,char* fileName,uint64_t currentPlaySize,uint64_t currentPlayOffset,uint64_t currentPlayBlockSize,uint64_t currentPlayBitrate,int32_t channels);

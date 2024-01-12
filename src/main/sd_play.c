@@ -13,6 +13,38 @@
 */
 #ifndef SD_PLAY_C
 #define SD_PLAY_C
+/**
+ * Files are played from file handles that usually are located on the sd card, but every
+ * location is fine as long as it is part of the esp32 vfs.
+ * The esp-adf pipeline system is used to inject the file data into the pipeline. The *Cb (*Callback)
+ * functions are used for this.
+ * The pipeline is built like this:
+ * 
+ *   Decoder  -> VolumeFilter -> I²S Driver
+ *      ^
+ *      |
+ *      v
+ *  *Cb functions
+ * 
+ * The decoder is intialized whenever a file starts playing (or is resumed). The fitting *Cb function is
+ * registered with the decoder to feed the binary file data into the decoder.
+ * As a pipeline is conceptually based on a stream it is unaware of specific positions within a file for
+ * resuming at specific time codes.
+ * The *Cb functions are built in a way that they will present the decoder all the needed header information
+ * to initalize correctly but then will jump to a specific file position if a file should be resumed.
+ * Depending on the file format this might result in the decoder to not play the first few frames correctly as
+ * the position might not be 100% frame correct. Usually this results in noise or clicks.
+ * To counteract this the VolumeFilter adds an initial silence of a few milliseconds after the start of the pipeline.
+ * The VolumeFilter also takes care of adjusting the decoded samples volume based on an x⁴ curve and upmixes single
+ * channel samples to stereo with identical left and right samples.
+ * Finally the I²S driver outputs the samples on the connected DAC.
+ * 
+ * VolumeFiler and I²S driver are created and initialized once and assigned a new pipeline whenever a file should be played.
+ * The I²S driver is only changing its configuration (samplerate, bits...) if needed as this process creates click sounds
+ * on some DACs.
+ * The decoder is always destroyed and created from scratch for every new file that is played.
+ * 
+ */
 #include <esp_log.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -54,6 +86,19 @@ bool SD_PLAY_codecSyned=false;
 SemaphoreHandle_t SD_PLAY_semStopPlaying;
 
 
+void SD_PLAY_HW_MUTE(){
+#ifdef SD_PLAY_HW_MUTE_PIN
+    gpio_set_level(SD_PLAY_HW_MUTE_PIN, 0);
+    vTaskDelay(pdTICKS_TO_MS(7));//it takes 104samples for an PCM510xA to be quiet, 16Khz->6,5ms
+#endif
+}
+
+void SD_PLAY_HW_UNMUTE(){
+#ifdef SD_PLAY_HW_MUTE_PIN
+    gpio_set_level(SD_PLAY_HW_MUTE_PIN, 1);
+#endif
+}
+
 //internal states
 //stopped=0
 //starting (ignores any stop or start requests but measures if running is not happening)=1
@@ -61,6 +106,13 @@ SemaphoreHandle_t SD_PLAY_semStopPlaying;
 //stopping (ignores any stop or start requests but measures if stopping is not happening)->reset if timeout=3
 uint8_t SD_PLAY_internalSM=0;
 
+/**
+  * @brief get the queue handle of the sd play output channel
+  *        this is needed to allow putting this in a queue set
+  *
+  * @return queue handle
+  * 
+  */
 QueueHandle_t SD_PLAY_getMessageQueue(){
     return SD_PLAY_outQueue;
 }
@@ -75,7 +127,7 @@ uint8_t SD_PLAY_sendMessageOut(SD_PLAY_message_t* msg, uint16_t waitTime){
 }
 
 
-#define SD_PLAY_VOLUMEFILTER_BUFFER_SIZE 128
+#define SD_PLAY_VOLUMEFILTER_BUFFER_SIZE 2*1024
 
 esp_err_t SD_PLAY_volumeFilterDestroy(audio_element_handle_t self) {
     return ESP_OK; 
@@ -91,11 +143,17 @@ esp_err_t SD_PLAY_volumeFilterClose(audio_element_handle_t self) {
 
 int64_t SD_PLAY_currentVolume = 0;
 
+/**
+  * @brief sets a new volume level, works during playing and in paused/stopped mode
+  *
+  * @param volume new volume level 0...10000
+  * 
+  */
 void SD_PLAY_volumeFilterSetVolume(int64_t volume) {
     if(volume>10000) volume=10000;
     if(volume<0) volume=0;
     volume=(volume*volume*volume*volume)/1000000000000;
-    SD_PLAY_currentVolume = volume;
+    SD_PLAY_currentVolume = volume*1.5;
 }
 
 uint16_t SD_PLAY_waitJump=0;//if 0 no need to wait, if >1 wait a bit
@@ -115,7 +173,7 @@ int SD_PLAY_volumeFilterProcess(audio_element_handle_t self, char *buffer, int s
         internalVolume=0;
     }else{
         if(SD_PLAY_waitJump){
-            if(SD_PLAY_waitJump<500){
+            if(SD_PLAY_waitJump<30){
                 internalVolume=0;
                 SD_PLAY_waitJump++;
             }
@@ -382,6 +440,23 @@ void SD_PLAY_stopPlaying(){
     }
 }
 
+int32_t SD_PLAY_lastSetupSampleRate=-1;
+int16_t SD_PLAY_lastSetupBits=-1;
+int16_t SD_PLAY_lastSetupChannels=-1;
+//reconfiguring the i²s clk makes pop sounds on some i²s DACs, this function acts a caching buffer, reconfiguring only if needed
+esp_err_t SD_PLAY_i2sSetup(int32_t sampleRate, int16_t bits, int16_t channels){
+    if((sampleRate!=SD_PLAY_lastSetupSampleRate)||(bits!=SD_PLAY_lastSetupBits)||(channels!=SD_PLAY_lastSetupChannels)){
+        SD_PLAY_HW_MUTE();
+        SD_PLAY_lastSetupSampleRate=sampleRate;
+        SD_PLAY_lastSetupBits=bits;
+        SD_PLAY_lastSetupChannels=channels;
+        esp_err_t ret=i2s_stream_set_clk(SD_PLAY_i2sStreamWriter, sampleRate, bits, channels);
+        SD_PLAY_HW_UNMUTE();
+        return ret;
+    }
+    return ESP_OK;
+}
+
 //plays a file over the setup pipeline until being stopped or the file ended
 void SD_PLAY_playLoopThread(){
     audio_event_iface_msg_t msg;
@@ -421,7 +496,7 @@ void SD_PLAY_playLoopThread(){
             audio_element_getinfo(SD_PLAY_i2sStreamWriter, &i2s_info);
             if((i2s_info.sample_rates!=music_info.sample_rates)||(i2s_info.bits!=music_info.bits)){
                 ESP_LOGE(SD_PLAY_LOG_TAG,"I2S and decoder disagree, choosing decoder %i,%i,%i",music_info.sample_rates, music_info.bits, music_info.channels);
-                i2s_stream_set_clk(SD_PLAY_i2sStreamWriter, music_info.sample_rates, music_info.bits, i2s_info.channels);
+                SD_PLAY_i2sSetup(music_info.sample_rates, music_info.bits, i2s_info.channels);
             }
             continue;
         }else
@@ -451,7 +526,7 @@ void SD_PLAY_playLoopThread(){
 uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
     
     SD_PLAY_stopPlaying();
-    
+
     SD_PLAY_codecSyned=false;
     SD_PLAY_amrSM=0;
     SD_PLAY_mp3SM=0;
@@ -480,7 +555,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
             if(FORMAT_HELPER_getMP3FormatInformation(SD_PLAY_currentPlayfile,&sampleRate,&bits,&channels,&SD_PLAY_offset,&SD_PLAY_bitrate,&SD_PLAY_blockSize,SD_PLAY_currentFileSize)==0){
                 ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting MP3: %lu,%lu,%lu,%lu",sampleRate,bits,channels,SD_PLAY_bitrate);
                 audio_element_set_music_info(SD_PLAY_volumeFilter,sampleRate,channels,bits);
-                if(i2s_stream_set_clk(SD_PLAY_i2sStreamWriter, sampleRate, bits, channels)!=ESP_OK){
+                if(SD_PLAY_i2sSetup(sampleRate, bits, channels)!=ESP_OK){
                     ESP_LOGE(SD_PLAY_LOG_TAG,"Presetting MP3 error.");
                 }
             }
@@ -500,7 +575,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
             if(FORMAT_HELPER_getM4AFormatInformation(SD_PLAY_currentPlayfile,&sampleRate,&bits,&channels,&SD_PLAY_offset,&SD_PLAY_bitrate,&SD_PLAY_blockSize,SD_PLAY_currentFileSize)==0){
                 ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting M4A: %lu,%lu,%lu",sampleRate,bits,channels);
                 audio_element_set_music_info(SD_PLAY_volumeFilter,sampleRate,channels,bits);
-                if(i2s_stream_set_clk(SD_PLAY_i2sStreamWriter, sampleRate, bits, channels)!=ESP_OK){
+                if(SD_PLAY_i2sSetup(sampleRate, bits, channels)!=ESP_OK){
                     ESP_LOGE(SD_PLAY_LOG_TAG,"Presetting M4A error.");
                 }
             }
@@ -521,7 +596,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
             if(FORMAT_HELPER_getAMRFormatInformation(SD_PLAY_currentPlayfile,&sampleRate,&bits,&channels,&SD_PLAY_offset,&SD_PLAY_bitrate,&SD_PLAY_blockSize,SD_PLAY_currentFileSize,&SD_PLAY_stereoUpMix)==0){
                 ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting AMR: %lu,%lu,%lu",sampleRate,bits,channels);
                 audio_element_set_music_info(SD_PLAY_volumeFilter,sampleRate,channels,bits);
-                if(i2s_stream_set_clk(SD_PLAY_i2sStreamWriter, sampleRate, bits, channels)!=ESP_OK){
+                if(SD_PLAY_i2sSetup(sampleRate, bits, channels)!=ESP_OK){
                     ESP_LOGE(SD_PLAY_LOG_TAG,"Presetting AMR error.");
                 }
             }
@@ -541,7 +616,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
             if(FORMAT_HELPER_getOGGFormatInformation(SD_PLAY_currentPlayfile,&sampleRate,&bits,&channels,&SD_PLAY_offset,&SD_PLAY_bitrate,&SD_PLAY_blockSize,SD_PLAY_currentFileSize)==0){
                 ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting OGG: %lu,%lu,%lu",sampleRate,bits,channels);
                 audio_element_set_music_info(SD_PLAY_volumeFilter,sampleRate,channels,bits);
-                if(i2s_stream_set_clk(SD_PLAY_i2sStreamWriter, sampleRate, bits, channels)!=ESP_OK){
+                if(SD_PLAY_i2sSetup(sampleRate, bits, channels)!=ESP_OK){
                     ESP_LOGE(SD_PLAY_LOG_TAG,"Presetting OGG error.");
                 }
             }
@@ -595,12 +670,36 @@ void SD_PLAY_messageLoopThread(){
     }
 }
 
-uint8_t SD_PLAY_startService(){
-    //init i2s port
+/**
+  * @brief inits only i²s components so that the DAC is quiet
+  * 
+  */
+void SD_PLAY_init(){
+#ifdef SD_PLAY_HW_MUTE_PIN
+    esp_rom_gpio_pad_select_gpio(SD_PLAY_HW_MUTE_PIN);
+    gpio_set_direction(SD_PLAY_HW_MUTE_PIN, GPIO_MODE_OUTPUT);
+#endif
+    SD_PLAY_HW_MUTE();
     i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
     i2s_cfg.type = AUDIO_STREAM_WRITER;
     i2s_cfg.i2s_config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
     SD_PLAY_i2sStreamWriter = i2s_stream_init(&i2s_cfg);
+}
+
+/**
+  * @brief starts all tasks and initializes the esp-adf components
+  * 
+  * @return 0=ok
+  * 
+  */
+uint8_t SD_PLAY_startService(){
+    //init i2s port
+    if(SD_PLAY_i2sStreamWriter==NULL){
+        i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
+        i2s_cfg.type = AUDIO_STREAM_WRITER;
+        i2s_cfg.i2s_config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
+        SD_PLAY_i2sStreamWriter = i2s_stream_init(&i2s_cfg);
+    }
 
     //create volume filter audio element
     audio_element_cfg_t cfg = DEFAULT_AUDIO_ELEMENT_CONFIG();
@@ -630,6 +729,15 @@ uint8_t SD_PLAY_startService(){
     return 0;
 }
 
+/**
+  * @brief sends a message to the sd play service
+  *
+  * @param msg pointer to the message to send
+  * @param waitTime wait time in ms to wait for message queue insertion
+  * 
+  * @return 0=ok message sent, 2=timeout message not sent
+  * 
+  */
 uint8_t SD_PLAY_sendMessage(SD_PLAY_message_t* msg, uint16_t waitTime){
     if(SD_PLAY_inQueue==NULL) return 1;
     if(xQueueOverwrite(SD_PLAY_inQueue,msg)!=pdPASS){
@@ -638,7 +746,15 @@ uint8_t SD_PLAY_sendMessage(SD_PLAY_message_t* msg, uint16_t waitTime){
     return 0;
 }
 
-
+/**
+  * @brief received a message from the sd play service
+  *
+  * @param msg pointer to the message to get
+  * @param waitTime wait time in ms to wait for message queue reading
+  * 
+  * @return 0=ok message received, 2=timeout no new message available
+  * 
+  */
 uint8_t SD_PLAY_getMessage(SD_PLAY_message_t* msg, uint16_t waitTime){
     if(SD_PLAY_outQueue==NULL) return 1;
     memset(msg,0,sizeof(SD_PLAY_message_t));

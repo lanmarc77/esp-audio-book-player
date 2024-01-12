@@ -13,10 +13,15 @@
 */
 #ifndef BATTERY_H
 #define BATTERY_H
+/*
+    This component starts a task to monitor the battery voltage
+    Battery voltage is taken every 0.5s and send through a fast but
+    jumpy digital filter and through a slow but stable filter
+    battery voltage is pretty noisy/jumpy on Heltec WiFi Kit 32 V3
+*/
 #include <stdint.h>
 
 void BATTERY_init();
-//return value in mV
 uint32_t BATTERY_getCurrentVoltage();
 uint32_t BATTERY_getCurrentVoltageStable();
 
