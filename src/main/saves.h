@@ -35,6 +35,9 @@ typedef struct{
     int32_t playChannels;
     char fileName[FF_FILE_PATH_MAX];
     char folderName[FF_FILE_PATH_MAX];
+    uint16_t playSpeed;
+    uint16_t equalizer;
+    uint8_t repeatMode;
 }SAVES_saveState_t;
 
 

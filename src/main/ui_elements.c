@@ -16,6 +16,7 @@
 
 #include "ssd1306.h"
 #include "ssd1306_fonts.h"
+#include "ui_main.h"
 #include "ui_elements.h"
 #include <string.h>
 #include <esp_log.h>
@@ -330,6 +331,62 @@ void UI_ELEMENTS_timeSelect(uint8_t x,uint8_t y,uint64_t secondsTime,uint8_t bli
         sprintf(&timeString[0],"%02i:%02i",(uint16_t)(secondsTime/3600),(uint16_t)((secondsTime%3600)/60));
     }
     SSD1306_printStr(x,y,&timeString[0]);
+}
+
+/**
+  * @brief shows equalizer preset
+  * 
+  * @param equalizer preset, 0=netural
+  *
+  */
+void UI_ELEMENTS_equalizer(uint8_t equalizer){
+    switch(equalizer){
+        case 0: 
+                SSD1306_printStr(5,1,"normal");
+                break;
+        case 1: 
+                SSD1306_printStr(3,1,"bass boost");
+                break;
+        case 2: 
+                SSD1306_printStr(5,1,"acoustic");
+                break;
+        case 3: 
+                SSD1306_printStr(5,1,"loudness");
+                break;
+        case 4: 
+                SSD1306_printStr(4,1,"vocal male");
+                break;
+        case 5: 
+                SSD1306_printStr(4,1,"vocal female");
+                break;
+    }
+}
+
+/**
+  * @brief shows repeat mode
+  * 
+  * @param repeatMode 0=no repeat, bit 1=folder repeat enabled, bit 2=autostart enabled
+  *
+  */
+void UI_ELEMENTS_repeatMode(uint8_t repeatMode){
+    if(repeatMode&UI_MAIN_REPEAT_FOLDER){
+        SSD1306_printStr(3,1,"|>  <->  ||");
+    }else{
+        SSD1306_printStr(3,1,"|>  -->  ||");
+    }
+}
+
+/**
+  * @brief shows play speed
+  * 
+  * @param playSpeed 50...300 meaning x0.5...x3.0
+  *
+  */
+void UI_ELEMENTS_playSpeed(uint16_t playSpeed){
+    char number[10];
+    SSD1306_printStr(5,1,">>>>>>>>");
+    sprintf(&number[0]," x%i.%02i ",playSpeed/100,playSpeed%100);
+    SSD1306_printStr(5,2,&number[0]);
 }
 
 /**

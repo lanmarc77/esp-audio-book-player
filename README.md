@@ -12,6 +12,8 @@ This is a device that is meant to play non-DRM audio books from an SD card and h
 - ASCII character based menu driven UI for 16x4 character screen
 - single rotary encoder navigation
 - sleep timer 1...99min, wakeup timer 1min...24hr
+- play speed settings from 0.5...2.5 in 0.05 steps (saved individually for each audio book)
+- audio equalizer (more/better presets are WIP)
 - auto power off
 - firmware upgrades from SD card
 - based on pure esp-idf + esp-adf
@@ -32,7 +34,7 @@ integrated in an old speaker that otherwise might have landed in the trash:
 the portable/smaller prototype version:  
 ![image](pictures/mobile_version.jpg)  
   
-[first poc](pictures/first_poc.jpg)
+[first POC (proof of concept)](pictures/first_poc.jpg)
   
 # Why?
 Currently (2023) one really needs to search hard to find an offline only non tracking audio book player that is
@@ -139,7 +141,8 @@ TODO: worldwide buyable model
 The runtime of the system is highly dependent on the current consumption. The current consumption depends on the
 type of audio played and mostly the volume. The following measurements were made using the
 setup prototype development board as seen above with 8 Ohm speaker OWS-131845W50A-8, 3.7V, 4GB class 10 Transcend
-microSD. An UNI-T UT61E with a 22µF tantal smoothing capacitor to handle the current peaks was used.  
+microSD. An UNI-T UT61E with a 22µF tantal smoothing capacitor to handle the current peaks was used. Play speed
+setting x1.0.  
 
   
 | scenario                             | volume setting  | current |
@@ -170,6 +173,8 @@ microSD. An UNI-T UT61E with a 22µF tantal smoothing capacitor to handle the cu
 At high volumes the energy needed by the speaker dominates the current consumption. Also the current is
 not very stable and highly depends on the content that is actually played.  
 The volume setting actually follows an x⁴ curve for translating % into power to fit our hearing.  
+Depending on play speed settings the current consumption rises. This is due to the fact that more data
+needs to be handled and the CPU frequency is stepped up. Approximately 2mA per 0.1 step speed up.  
   
 An 18650 battery with 2500mAh will most certainly hold 50hrs assuming average volume levels between 50%...75%.  
   
@@ -240,16 +245,16 @@ AC=any type of click
   |     |     |       |    |      |
   |     |     |       |     ----   -
   |     |     |       | AC      |   |
-  |     |     v       |         |   |
-  |     |    audio book content |   |
-  |     |    |   scan screen    |   |<-------------------------
-  |     |    |    |             |   |                          |
-  |     |    |    | 0 files     |   |                          |
-  |     |    |    | found?      |   |                          |
-  |     |    |    |             |   |                          |
-  |     |    |     -------------    |    volume change         |
+  |     |     v       |         |   |<-------------------------
+  |     |    audio book content |   |                          |
+  |     |    |   scan screen    |   |                          |
+  |     |    |    |             |   |       next sub screen    |
+  |     |    |    | 0 files     |   |       ---------------    |
+  |     |    |    | found?      |   |      |               |   |
+  |     |    |    |             |   |      v            SC |   |
+  |     |    |     -------------    |    play overlay ----     |
   |     |    |                      |    screen                |
-  |     |    | scan      -----------     |1s  ^                |
+  |     |    | scan      -----------     |2s  ^                |
   |     |    | finished |                |    |                |
   |     |    |          | LC             |    |rotate          | LC
   |     |    v          |    SC          v    |   SC           |
@@ -446,18 +451,41 @@ The value 3m is only displayed if a sleep timer was setup and activated and show
 The progress bar at the bottom shows the progress within the current chapter.  
 On right side the battery level in percent is shown.  
   
-### Volume change screen
+### Play overlay screen
 ```
- ----------------
-|################|
-|################|
-|##              |
-|      5100      |
- ----------------
+     volume               play speed
+ ----------------      ----------------  
+|################|    |                |
+|################| -> |     >>>>>>>>   |
+|##              |    |      x1.20     |
+|      5100      |    |                |
+ ----------------      ----------------
+        ^                     |
+        |                     v
+  repeat mode              equalizer
+ ----------------      ----------------  
+|                |    |                |
+|  |>  -->  ||   | <- |     normal     |
+|                |    |                |
+|                |    |                |
+ ----------------      ----------------
 ```
-The # characters are a visual representation of the setup volume. Volume level ranges from 0...10000. 7500 actually
+The play overlay screen is activated when a file is played and rotation is used. If it is active a short click
+is going through the different settings. This screen will automatically switch back to the play screen after 2s of
+no user input but will remember for 8 more seconds at which sub menu it was left.  
+  
+Volume: The # characters are a visual representation of the setup volume. Volume level ranges from 0...10000. 7500 actually
 marks 100% audio volume of the source everything above this will add a gain of up to 25% to the source volume level.  
   
+Play speed: Using rotation the speed can be setup. Play speed is changed instantly and stored individually for each audio book.  
+  
+Equalizer:  Using rotate you can choose between the different equalizer presets. The setting is stored individually
+for each audio book.  
+  
+Repeat mode:  Using rotate one can choose to enable folder repeat (<-->) or not (-->). The setting is stored individually
+for each audio book.  
+  
+
 ### Sleep timer setup screen
 ```
  ----------------
@@ -787,13 +815,11 @@ I might implement support for it.
 It might also be possible to make this project compile with the classic ESP32 that does support classic Bluetooth using SBC.
 But I do not plan for this as I use headphones with a jack and no extra battery I need to take care of.  
   
-## Audio processing, equalizer, play speeds - Help needed
-I would like to implement functions for selecting different equalizer settings and also playing speeds.  
-My knowledge about audio processing was enough to implement a mono->stereo upmix function and volume settings but is
-not enough for more.  
-Simply increasing or decreasing the sample rate will result in not acceptable voice distortions.
-If anyone can help do not hesitate. All decoded 16-bit wide samples pass the function `SD_PLAY_volumeFilterProcess` in
-file `sd_play.c`.  
+## Audio processing
+The ESP32 starts with the lowest possible CPU speed of 80Mhz. This is not enough CPU power if certain audio processing
+options are enabled. Especially if the play speed has a high setting 80Mhz is not enough for the calculations needed. 
+The program increases CPU speed to 160Mhz when play speed is getting greater than 1 and to 240Mhz for value greater 2.
+This will increase power consumption and reduce system runtime.  
   
 # Ideas/future
 - multi user support with individual bookmarks

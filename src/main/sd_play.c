@@ -66,6 +66,8 @@
 #include "audio_mutex.h"
 #include "audio_error.h"
 #include "audio_thread.h"
+#include "audio_sonic.h"
+#include "equalizer.h"
 
 #define SD_PLAY_LOG_TAG "SD_PLAY"
 QueueHandle_t SD_PLAY_inQueue=NULL;
@@ -78,7 +80,7 @@ fpos_t SD_PLAY_currentFilePos=0;
 fpos_t SD_PLAY_desiredFilePos=0;
 
 audio_pipeline_handle_t SD_PLAY_pipeline=NULL;
-audio_element_handle_t SD_PLAY_i2sStreamWriter=NULL, SD_PLAY_musicFormatDecoder=NULL,SD_PLAY_volumeFilter=NULL;
+audio_element_handle_t SD_PLAY_i2sStreamWriter=NULL, SD_PLAY_musicFormatDecoder=NULL,SD_PLAY_volumeFilter=NULL,SD_PLAY_speedFilter=NULL,SD_PLAY_equalizerFilter=NULL;
 audio_event_iface_handle_t SD_PLAY_eventChannel=NULL;
 //set true if the ESP32 codec could figure out bitrate, bits and samplerates, used to determine when it is ok to seek to also bad file postions
 bool SD_PLAY_codecSyned=false;
@@ -139,6 +141,49 @@ esp_err_t SD_PLAY_volumeFilterOpen(audio_element_handle_t self) {
 
 esp_err_t SD_PLAY_volumeFilterClose(audio_element_handle_t self) {
   return ESP_OK; 
+}
+
+uint8_t SD_PLAY_currentEqualizer = 0;
+int SD_PLAY_equalizerPresets[][20] = {{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                                        { 26, 26, 13, 13, 0, 0, 0, 0, 0, 0, 26, 26, 13, 13, 0, 0, 0, 0, 0, 0}
+                                    };
+
+/**
+  * @brief sets a new equalizer preset
+  *
+  * @param equalizer new preset, 0=neutral
+  * 
+  */
+void SD_PLAY_setEqualizer(uint8_t equalizer){
+    SD_PLAY_currentEqualizer=equalizer;
+    if(SD_PLAY_equalizerFilter!=NULL){
+        for(uint8_t i=0;i<10;i++){
+            if(equalizer_set_gain_info(SD_PLAY_equalizerFilter, i, SD_PLAY_equalizerPresets[SD_PLAY_currentEqualizer][i], true)!=ESP_OK){
+                ESP_LOGE(SD_PLAY_LOG_TAG,"Error setting equalizer index %i",i);
+            }
+        }
+    }
+}
+
+float SD_PLAY_currentPlaySpeed = 1.00;
+
+/**
+  * @brief sets a new play speed, works during playing and in paused/stopped mode
+  *
+  * @param volume new play speed 50...300 equals x0.50...x3.00
+  * 
+  */
+void SD_PLAY_setPlaySpeed(uint16_t playSpeed){
+    if(playSpeed>300){
+        playSpeed=300;
+    }
+    if(playSpeed<50){
+        playSpeed=50;
+    }
+    SD_PLAY_currentPlaySpeed=playSpeed/100.0;
+    if(SD_PLAY_speedFilter!=NULL){
+        sonic_set_pitch_and_speed_info(SD_PLAY_speedFilter, 1.0, SD_PLAY_currentPlaySpeed);
+    }
 }
 
 int64_t SD_PLAY_currentVolume = 0;
@@ -420,8 +465,14 @@ void SD_PLAY_stopPlaying(){
             }
 
             audio_pipeline_unregister(SD_PLAY_pipeline, SD_PLAY_i2sStreamWriter);
+            audio_pipeline_unregister(SD_PLAY_pipeline, SD_PLAY_speedFilter);
+            audio_pipeline_unregister(SD_PLAY_pipeline, SD_PLAY_equalizerFilter);
             audio_pipeline_unregister(SD_PLAY_pipeline, SD_PLAY_volumeFilter);
             audio_pipeline_unregister(SD_PLAY_pipeline, SD_PLAY_musicFormatDecoder);
+            audio_element_deinit(SD_PLAY_equalizerFilter);
+            SD_PLAY_equalizerFilter=NULL;
+            audio_element_deinit(SD_PLAY_speedFilter);
+            SD_PLAY_speedFilter=NULL;
             audio_element_deinit(SD_PLAY_musicFormatDecoder);
             SD_PLAY_musicFormatDecoder=NULL;
 
@@ -523,6 +574,20 @@ void SD_PLAY_playLoopThread(){
     vTaskDelete( NULL );
 }
 
+uint16_t SD_PLAY_getClosestSupportSampleRate(uint16_t sampleRate){
+    if(sampleRate>=48000){
+        return 48000;
+    }else if(sampleRate>=44100){
+        return 44100;
+    }else if(sampleRate>=22050){
+        return 22050;
+    }else if(sampleRate>=11025){
+        return 11025;
+    }
+    return 11025;
+}
+
+int SD_PLAY_gainTable[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
     
     SD_PLAY_stopPlaying();
@@ -626,6 +691,23 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
     }else{
         return 2;
     }
+
+    sonic_cfg_t sonic_cfg = DEFAULT_SONIC_CONFIG();
+    sonic_cfg.sonic_info.samplerate = sampleRate;
+    sonic_cfg.sonic_info.channel = channels;
+    sonic_cfg.sonic_info.resample_linear_interpolate = 0;
+    sonic_cfg.task_core=0;
+    SD_PLAY_speedFilter=sonic_init(&sonic_cfg);
+    sonic_set_pitch_and_speed_info(SD_PLAY_speedFilter, 1.0, SD_PLAY_currentPlaySpeed);
+
+    equalizer_cfg_t eq_cfg = DEFAULT_EQUALIZER_CONFIG();
+    eq_cfg.channel = channels;
+    eq_cfg.samplerate=SD_PLAY_getClosestSupportSampleRate(sampleRate);;
+    eq_cfg.task_core=0;
+    eq_cfg.set_gain = SD_PLAY_gainTable;
+    SD_PLAY_equalizerFilter = equalizer_init(&eq_cfg);
+
+
     SD_PLAY_channels=channels;
     SD_PLAY_desiredFilePos=filePos;
     //pipeline creating
@@ -635,15 +717,19 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
 
     audio_pipeline_register(SD_PLAY_pipeline, SD_PLAY_musicFormatDecoder, "mfd");
     audio_pipeline_register(SD_PLAY_pipeline, SD_PLAY_volumeFilter, "volume");
+    audio_pipeline_register(SD_PLAY_pipeline, SD_PLAY_speedFilter, "speed");
+    audio_pipeline_register(SD_PLAY_pipeline, SD_PLAY_equalizerFilter, "equalizer");
     audio_pipeline_register(SD_PLAY_pipeline, SD_PLAY_i2sStreamWriter, "i2s");
 
-    const char *link_tags[3] = {"mfd", "volume","i2s"};
-    audio_pipeline_link(SD_PLAY_pipeline, &link_tags[0], 3);
+    const char *link_tags[5] = {"mfd", "volume","speed","equalizer","i2s"};
+    audio_pipeline_link(SD_PLAY_pipeline, &link_tags[0], 5);
 
     audio_event_iface_cfg_t evtCfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
     SD_PLAY_eventChannel = audio_event_iface_init(&evtCfg);
     audio_pipeline_set_listener(SD_PLAY_pipeline, SD_PLAY_eventChannel);
     audio_pipeline_run(SD_PLAY_pipeline);
+
+    SD_PLAY_setEqualizer(SD_PLAY_currentEqualizer);
 
     xTaskCreate(SD_PLAY_playLoopThread, "SD_PLAY_playLoopThread", 1024 * 10, NULL,  uxTaskPriorityGet(NULL), NULL);
 

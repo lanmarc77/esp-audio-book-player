@@ -15,6 +15,7 @@
 #define SCREENS_C
 #include "esp_timer.h"
 #include "screens.h"
+#include "ui_main.h"
 #include "ui_elements.h"
 #include "ff_handling.h"
 
@@ -148,13 +149,30 @@ void SCREENS_lowBattery(uint32_t batt){
 /**
   * @brief shows the volume setup screen
   *
+  * @param mode mode to display 0=volume, 1=play speed, 2=equalizer, 3=repeat settings
   * @param volume current volume level 0...10000
+  * @param playSpeed current play speed setting 50...300 meaning x0.5...x3.0
+  * @param equalizer a number representing the current equalizer preset 0=neutral equalizer
+  * @param repeatMode currently selected repeatMode
   * 
   */
-void SCREENS_volumeChange(int64_t volume){
-    UI_ELEMENTS_cls();
-    UI_ELEMENTS_volume(volume);
-    UI_ELEMENTS_update();
+void SCREENS_playOverlay(uint8_t mode, int64_t volume,uint16_t playSpeed,uint8_t equalizer,uint8_t repeatMode){
+  UI_ELEMENTS_cls();
+  switch(mode){
+    case 0: //volume
+          UI_ELEMENTS_volume(volume);
+          break;
+    case 1: //play speed
+          UI_ELEMENTS_playSpeed(playSpeed);
+          break;
+    case 2: //equalizer
+          UI_ELEMENTS_equalizer(equalizer);
+          break;
+    case 3: //repeat mode
+          UI_ELEMENTS_repeatMode(repeatMode);
+          break;
+  }
+  UI_ELEMENTS_update();
 }
 
 /**
@@ -166,14 +184,14 @@ void SCREENS_volumeChange(int64_t volume){
   * @param currentPlayMinute the current listening postion minute
   * @param currentPlaySecond the current listening postion second
   * @param percent percentage of listening postion
-  * @param searchFlags special flags for the current track (e.g. autorepeat)
+  * @param repeatMode special flags for the current audio book
   * @param allPlayMinute minutes length of the current track
   * @param allPlaySecond seconds length of the current track
   * @param batt current battery level in mV
   * @param sleepTimeSecondsLeft if >0 the seconds left of the sleep timer is displayed
   * 
   */
-void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint8_t searchFlags,uint16_t allPlayMinute,uint8_t allPlaySecond,uint32_t batt,uint32_t sleepTimeSecondsLeft){
+void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint8_t repeatMode,uint16_t allPlayMinute,uint8_t allPlaySecond,uint32_t batt,uint32_t sleepTimeSecondsLeft){
     uint64_t now=esp_timer_get_time();
     UI_ELEMENTS_cls();
     UI_ELEMENTS_progressBar(percent);
@@ -184,7 +202,7 @@ void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,
     }
     UI_ELEMENTS_textScrolly(0,0,14,&folderName[0]);
     UI_ELEMENTS_numberSelect(0,1,selectedFile,amountOfFiles,0);
-    if(searchFlags&FF_REPEAT_FLAG){
+    if(repeatMode&UI_MAIN_REPEAT_FOLDER){
         UI_ELEMENTS_mainSymbol(13);
     }else{
         UI_ELEMENTS_mainSymbol(2);
@@ -242,6 +260,7 @@ void SCREENS_startUp(uint8_t imageFlags){
     char b[10];
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(9);
+    //sprintf(&b[0],"TINAMP");UI_ELEMENTS_textScrolly(4,0,6,&b[0]);
     if(imageFlags&8){
         sprintf(&b[0],"ok");
         UI_ELEMENTS_textScrolly(7,2,2,&b[0]);
