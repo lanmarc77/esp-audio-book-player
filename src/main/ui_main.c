@@ -836,7 +836,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                                         UI_MAIN_cpuNormal();
                                                     }
                                                     break;
-                                        case 2:     if(currentEqualizer<1){
+                                        case 2:     if(currentEqualizer<6){
                                                         currentEqualizer++;
                                                     }
                                                     SD_PLAY_setEqualizer(currentEqualizer);

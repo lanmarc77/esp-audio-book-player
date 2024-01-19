@@ -345,19 +345,22 @@ void UI_ELEMENTS_equalizer(uint8_t equalizer){
                 SSD1306_printStr(5,1,"normal");
                 break;
         case 1: 
-                SSD1306_printStr(3,1,"bass boost");
+                SSD1306_printStr(6,1,"bass");
                 break;
         case 2: 
-                SSD1306_printStr(5,1,"acoustic");
+                SSD1306_printStr(1,1,"bass and treble");
                 break;
         case 3: 
-                SSD1306_printStr(5,1,"loudness");
+                SSD1306_printStr(5,1,"treble");
                 break;
         case 4: 
-                SSD1306_printStr(4,1,"vocal male");
+                SSD1306_printStr(3,1,"headphone");
                 break;
         case 5: 
-                SSD1306_printStr(4,1,"vocal female");
+                SSD1306_printStr(5,1,"voice 1");
+                break;
+        case 6: 
+                SSD1306_printStr(5,1,"voice 2");
                 break;
     }
 }

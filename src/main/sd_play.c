@@ -144,8 +144,16 @@ esp_err_t SD_PLAY_volumeFilterClose(audio_element_handle_t self) {
 }
 
 uint8_t SD_PLAY_currentEqualizer = 0;
-int SD_PLAY_equalizerPresets[][20] = {{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                                        { 26, 26, 13, 13, 0, 0, 0, 0, 0, 0, 26, 26, 13, 13, 0, 0, 0, 0, 0, 0}
+//according to documentation the 10 bands split in left and right in the array use the following frequencies:
+//31 Hz,62 Hz,125 Hz,250 Hz,500 Hz,1 kHz,2 kHz,4 kHz,8 kHz,16 kHz
+//array numbers are in dB
+int SD_PLAY_equalizerPresets[][20] = {{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},//neutral
+                                      { -16, -8, 10, 10, 6, 2, -4, -4, -8, -11, -16, -8, 10, 10, 6, 2, -4, -4, -8, -11}, //bass boost
+                                      { 14, 7, 6, 0, -7, -5, 2, 2, 8, 12, 14, 7, 6, 0, -7, -5, 2, 2, 8, 12},//full bass and trebble
+                                      { -18, -10, -10, -10, -4, 2, 11, 11, 16, 16, -18, -10, -10, -10, -4, 2, 11, 11, 16, 16},//full trebble
+                                      { 10, 5, 12, 6, -3, -2, 2, 2, 5, 16, 10, 5, 12, 6, -3, -2, 2, 2, 5, 16},//headphone
+                                      { -20, -20, 4, 8, 0, 0, 0, -4, -8, -8, -20, -20, 4, 8, 0, 0, 0, -4, -8, -8},//voice 1 (female more bass less treble)
+                                      { -20, -20, 2, 4, 0, 0, -4, -2, 2, 4, -20, -20, 2, 4, 0, 0, -4, -2, 2, 4},//voice 2 (male less bass more treble)
                                     };
 
 /**

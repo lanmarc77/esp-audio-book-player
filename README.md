@@ -13,7 +13,8 @@ This is a device that is meant to play non-DRM audio books from an SD card and h
 - single rotary encoder navigation
 - sleep timer 1...99min, wakeup timer 1min...24hr
 - play speed settings from 0.5...2.5 in 0.05 steps (saved individually for each audio book)
-- audio equalizer (more/better presets are WIP)
+- audio equalizer (saved individually for each audio book)
+- endless auto repeat mode of selected audio book
 - auto power off
 - firmware upgrades from SD card
 - based on pure esp-idf + esp-adf
@@ -65,6 +66,7 @@ Download and watch:
 [Scenario5](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario5.mp4): sleep timer  
 [Scenario6](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario6.mp4): wakeup timer  
 [Scenario7](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario7.mp4): firmware upgrade  
+[Scenario8](https://github.com/lanmarc77/esp-audio-book-player/raw/main/videos/scenario8.mp4): play speed, equalizer, repeat mode  
   
 # Hardware
 The build only needs a few components that are manufactured by companies in mass and therefore cheap.  
@@ -300,7 +302,7 @@ If something can be setup using rotation usually that element flashes.
 |                |
 |     (o_o)      |
 |       ok       |
-|   v00.00.05    |
+|   v00.00.06    |
  ----------------
 ```
 Shows the firmware version number. If ok is displayed the firmware is persisted. If TEST is displayed
@@ -315,7 +317,7 @@ the firmware is not persisted and if the player powers off automatically the old
 |[=========-    ]|
  ----------------
 ```
-If the button is hold down until the progress at the bottom has counted down the player
+If the button is hold down until the progress bar at the bottom has counted down the player
 will delete all bookmarks and reset all user settings to default values.  
   
 ### Reset screen
@@ -824,5 +826,5 @@ This will increase power consumption and reduce system runtime.
 # Ideas/future
 - multi user support with individual bookmarks
 - audio navigation for handicapped people
-- printed PCB with fitting 3D printable case or fitting for a cheap buyable case
+
 
