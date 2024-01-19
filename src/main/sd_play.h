@@ -48,6 +48,8 @@ uint8_t SD_PLAY_startService();
 uint8_t SD_PLAY_sendMessage(SD_PLAY_message_t* msg, uint16_t waitTime);
 uint8_t SD_PLAY_getMessage(SD_PLAY_message_t* msg, uint16_t waitTime);
 void SD_PLAY_volumeFilterSetVolume(int64_t volume);
+void SD_PLAY_setPlaySpeed(uint16_t playSpeed);
+void SD_PLAY_setEqualizer(uint8_t equalizer);
 QueueHandle_t SD_PLAY_getMessageQueue();
 
 #endif

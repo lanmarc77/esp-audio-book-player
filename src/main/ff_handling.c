@@ -33,12 +33,11 @@
   * @param[in] inQueue pointer to queue handle to stop the sorting process from the UI, send -1 to request a stop
   * @param[in] searchString pointer to a string of one specific entrystring (usually a filename) whichs sorting position is to be reported in searchId
   * @param[out] searchId pointer to a value which will hold the sorting postion in the sortedIdArray of the file to be searched via searchString
-  * @param[out] flags bit0=repeat.dat found in folder, bit1: autostart.dat found in folder
   * 
   * @return 1=ok, finished (-1 is sent to outQueue), 2=folderPath not found (-2 is sent to outQueue)
   *         3=to many entries (-3 is sent to outQueue), 4=canceld sorting/finding as requested (-4 is sent to outQueue)
   */
-uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedIdArray,uint8_t ffType,QueueHandle_t* outQueue, QueueHandle_t* inQueue, char* searchString,int32_t* searchId,uint8_t* flags){
+uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedIdArray,uint8_t ffType,QueueHandle_t* outQueue, QueueHandle_t* inQueue, char* searchString,int32_t* searchId){
     uint16_t maxIdCounter=FF_MAX_SORT_ELEMENTS;//limits the files to sort even if more files exist
     struct dirent *currentEntry;
     DIR *dir = NULL;
@@ -114,16 +113,6 @@ uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedId
                 }
                 if(ffType==1){//check valid file extensions
                     uint16_t l=strlen(currentEntry->d_name);
-                    if(strcmp(&currentEntry->d_name[0],"repeat.dat")==0){//TODO: remove and put to user settings
-                        if(flags!=NULL){
-                            *flags|=FF_REPEAT_FLAG;
-                        }
-                    }
-                    if(strcmp(&currentEntry->d_name[0],"autostart.dat")==0){//TODO: remove and put to user settings
-                        if(flags!=NULL){
-                            *flags|=FF_AUTOSTART_FLAG;
-                        }
-                    }
                     if(!((strncasecmp(&currentEntry->d_name[l-3],"mp3",3)==0) ||
                          (strncasecmp(&currentEntry->d_name[l-3],"awb",3)==0) ||
                          (strncasecmp(&currentEntry->d_name[l-3],"amr",3)==0) ||

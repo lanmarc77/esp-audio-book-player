@@ -33,7 +33,7 @@
 #include "ui_main.h"
 
 
-#define MAIN_WATCHDOG_TIMEOUT 500
+#define MAIN_WATCHDOG_TIMEOUT 1000
 #define MAIN_LOG_TAG "MAIN"
 
 #define WAKEUP_PIN 7

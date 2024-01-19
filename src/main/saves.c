@@ -174,7 +174,9 @@ uint8_t SAVES_existsBookmark(char* folderName,SAVES_saveState_t* save){
         return 1;
     }
     int32_t result=fread(save,1,sizeof(SAVES_saveState_t),f);
-    if(result>=sizeof(SAVES_saveState_t)){
+    if ((result<sizeof(SAVES_saveState_t)&&(feof(f)))
+        ||(result==sizeof(SAVES_saveState_t))
+    ){
         ESP_LOGI(SAVES_LOG_TAG,"Restored ok. folder \"%s\" file \"%s\" ",save->folderName,save->fileName);
         fclose(f);
         return 0;

@@ -22,6 +22,8 @@
 #define UI_MAIN_STARTUPFLAG_MANUAL 1
 #define UI_MAIN_STARTUPFLAG_RTC 2
 
+#define UI_MAIN_REPEAT_FOLDER 1
+
 void UI_MAIN_init();
 void UI_MAIN_run(uint8_t startUpFlags);
 void UI_MAIN_deInit();

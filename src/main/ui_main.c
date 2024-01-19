@@ -69,13 +69,30 @@ QueueHandle_t UI_MAIN_rotaryEventQueue;
 void UI_MAIN_cpuFull(){
     rtc_cpu_freq_config_t conf, cconf;
     rtc_clk_cpu_freq_get_config(&cconf);
+    if(cconf.freq_mhz==240) return;
     if(!rtc_clk_cpu_freq_mhz_to_config(240, &conf)){
         ESP_LOGE(UI_MAIN_LOG_TAG,"CPU clock could not be set to %u MHz", 240);
     }else{
+        ESP_LOGI(UI_MAIN_LOG_TAG,"CPU clock set to %u MHz", 240);
         rtc_clk_cpu_freq_set_config_fast(&conf);
     }
 }
 
+/**
+  * @brief clocks the CPU to middle speed
+  *
+  */
+void UI_MAIN_cpuMiddle(){
+    rtc_cpu_freq_config_t conf, cconf;
+    rtc_clk_cpu_freq_get_config(&cconf);
+    if(cconf.freq_mhz==160) return;
+    if(!rtc_clk_cpu_freq_mhz_to_config(160, &conf)){
+        ESP_LOGE(UI_MAIN_LOG_TAG,"CPU clock could not be set to %u MHz", 160);
+    }else{
+        ESP_LOGI(UI_MAIN_LOG_TAG,"CPU clock set to %u MHz", 160);
+        rtc_clk_cpu_freq_set_config_fast(&conf);
+    }
+}
 /**
   * @brief clocks the CPU to normal speed
   *
@@ -83,9 +100,11 @@ void UI_MAIN_cpuFull(){
 void UI_MAIN_cpuNormal(){
     rtc_cpu_freq_config_t conf, cconf;
     rtc_clk_cpu_freq_get_config(&cconf);
+    if(cconf.freq_mhz==80) return;
     if(!rtc_clk_cpu_freq_mhz_to_config(80, &conf)){
         ESP_LOGE(UI_MAIN_LOG_TAG,"CPU clock could not be set to %u MHz", 80);
     }else{
+        ESP_LOGI(UI_MAIN_LOG_TAG,"CPU clock set to %u MHz", 80);
         rtc_clk_cpu_freq_set_config_fast(&conf);
     }
 }
@@ -172,13 +191,12 @@ char UI_MAIN_filePath[FF_FILE_PATH_MAX];
 
 char* UI_MAIN_searchString=NULL;
 int32_t* UI_MAIN_searchId=NULL;
-uint8_t* UI_MAIN_searchFlags=NULL;
 char fileLine[255];
 char UI_MAIN_dirEntry[255];
 void UI_MAIN_scanSortTaskAllBooks(){
     UI_MAIN_cpuFull();
     memset(&UI_MAIN_sortedBookIDs[0],0,sizeof(UI_MAIN_sortedBookIDs));
-    FF_getList(SD_CARD_MOUNT_POINT,&UI_MAIN_amountOfBooks,&UI_MAIN_sortedBookIDs[0],0,&UI_MAIN_scanQueueOut,&UI_MAIN_scanQueueIn,UI_MAIN_searchString,UI_MAIN_searchId,UI_MAIN_searchFlags);
+    FF_getList(SD_CARD_MOUNT_POINT,&UI_MAIN_amountOfBooks,&UI_MAIN_sortedBookIDs[0],0,&UI_MAIN_scanQueueOut,&UI_MAIN_scanQueueIn,UI_MAIN_searchString,UI_MAIN_searchId);
     UI_MAIN_cpuNormal();
     vTaskDelete(NULL);
 }
@@ -186,7 +204,7 @@ void UI_MAIN_scanSortTaskAllBooks(){
 void UI_MAIN_scanSortTaskOneBook(){
     UI_MAIN_cpuFull();
     memset(&UI_MAIN_sortedFileIDs[0],0,sizeof(UI_MAIN_sortedFileIDs));
-    FF_getList(&UI_MAIN_folderPath[0],&UI_MAIN_amountOfFiles,&UI_MAIN_sortedFileIDs[0],1,&UI_MAIN_scanQueueOut,&UI_MAIN_scanQueueIn,UI_MAIN_searchString,UI_MAIN_searchId,UI_MAIN_searchFlags);
+    FF_getList(&UI_MAIN_folderPath[0],&UI_MAIN_amountOfFiles,&UI_MAIN_sortedFileIDs[0],1,&UI_MAIN_scanQueueOut,&UI_MAIN_scanQueueIn,UI_MAIN_searchString,UI_MAIN_searchId);
     UI_MAIN_cpuNormal();
     vTaskDelete(NULL);
 }
@@ -260,9 +278,14 @@ char UI_MAIN_pcWriteBuffer[2048];
     uint64_t currentPlayBlockSize=0;
     uint64_t currentPlayBitrate=0;
     int32_t currentPlayChannels=0;
+    uint16_t currentPlaySpeed=100; //100=1.00, 300=3.00, 50=0.5
+    uint8_t currentEqualizer=0;
+    uint8_t currentRepeatMode=0;
     uint64_t lastSdPlayMessage=0;
-    uint64_t lastVolumeChangedTime=esp_timer_get_time()-5*1000000;
+    uint64_t lastPlayOverlayChangedTime=esp_timer_get_time()-5*1000000;
     uint64_t lastMinuteChangedTime=esp_timer_get_time()-5*1000000;
+    uint8_t playOverlayMode=0;
+    bool playOverlayActive=false;
     uint64_t sleepTimeOffTime=0;//the timestamp when the currently setup sleeptime is reached
     uint32_t sleepTimeSetupS=UI_MAIN_DEFAULT_SLEEP_TIME_S;//the setup sleeptime
     uint64_t wakeupTimeSetupS=3600;
@@ -276,7 +299,6 @@ char UI_MAIN_pcWriteBuffer[2048];
     UI_MAIN_offTimestamp=esp_timer_get_time();
 
     int32_t searchId=-1;
-    uint8_t searchFlags=0;
     uint8_t powerOffSM=0;
     uint8_t sleepOffSM=0;
     uint8_t skipped=0;
@@ -331,7 +353,6 @@ char UI_MAIN_pcWriteBuffer[2048];
                     if(SD_CARD_init()==0){
                         UI_MAIN_fwUpgradeRun();
                         mainSM=UI_MAIN_RUN_SM_FOLDER_SCAN;
-                        UI_MAIN_searchFlags=NULL;
                         UI_MAIN_searchId=NULL;
                         UI_MAIN_searchString=NULL;
                         if(SAVES_getUsedSpaceLevel()>=75){
@@ -415,8 +436,6 @@ char UI_MAIN_pcWriteBuffer[2048];
                             strcpy(&UI_MAIN_folderPath[0],SD_CARD_MOUNT_POINT"/");
                             strcat(&UI_MAIN_folderPath[0],&UI_MAIN_selectedFolderName[0]);
 
-                            searchFlags=0;
-                            UI_MAIN_searchFlags=&searchFlags;
                             if(SAVES_existsBookmark(&UI_MAIN_selectedFolderName[0],&UI_MAIN_saveState)==0){
                                 UI_MAIN_searchString=&UI_MAIN_saveState.fileName[0];
                                 UI_MAIN_searchId=&searchId;
@@ -494,6 +513,9 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 currentPlayChannels=0;
                                 currentPlayBitrate=0;
                                 newPlayMinute=0;
+                                currentPlaySpeed=100;
+                                currentEqualizer=0;
+                                currentRepeatMode=0;
                                 mainSM=UI_MAIN_RUN_SM_PAUSED;
                                 if(searchId>=0){//did we search for a filename that was last listened and found one?
                                     strcpy(&UI_MAIN_selectedFileName[0],&UI_MAIN_saveState.fileName[0]);
@@ -506,8 +528,14 @@ char UI_MAIN_pcWriteBuffer[2048];
                                     currentPlayBlockSize=UI_MAIN_saveState.playBlockSize;
                                     currentPlayBitrate=UI_MAIN_saveState.playBitrate;
                                     currentPlayChannels=UI_MAIN_saveState.playChannels;
+                                    currentPlaySpeed=UI_MAIN_saveState.playSpeed;
+                                    if(currentPlaySpeed<50) currentPlaySpeed=100;
+                                    if(currentPlaySpeed>300) currentPlaySpeed=100;
+                                    currentEqualizer=UI_MAIN_saveState.equalizer;
+                                    currentRepeatMode=UI_MAIN_saveState.repeatMode;
                                     currentPlayPosition=FORMAT_HELPER_getFilePosByPlayTimeAndExtension(currentPlaySecond,currentPlayMinute,&UI_MAIN_selectedFileName[0],currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,currentPlayChannels);
                                 }
+                                SD_PLAY_setEqualizer(currentEqualizer);
                                 UI_MAIN_screenOnIfNeeded();
                                 UI_MAIN_searchString=NULL;
                                 UI_MAIN_searchId=NULL;
@@ -530,6 +558,8 @@ char UI_MAIN_pcWriteBuffer[2048];
                     }
                     break;
             case UI_MAIN_RUN_SM_PAUSED:
+                    playOverlayMode=0;
+                    UI_MAIN_cpuNormal();
                     if(pauseMode==0){//with chapter selection
                         FORMAT_HELPER_getPlayTimeByExtension(&currentPlaySecond,&currentPlayMinute,&percent,&UI_MAIN_selectedFileName[0],currentPlayPosition,currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,&allPlaySecond,&allPlayMinute,currentPlayChannels);
                         SCREENS_pause0(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],currentPlayMinute,currentPlaySecond,percent,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
@@ -539,8 +569,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                         FORMAT_HELPER_getPlayTimeByExtension((uint8_t*)&dummy,(uint16_t*)&dummy,&percent,&UI_MAIN_selectedFileName[0],newPlayPosition,currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,&allPlaySecond,&allPlayMinute,currentPlayChannels);
                         SCREENS_pause1(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],newPlayMinute,currentPlaySecond,percent,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
                     }
-                    if((searchFlags&FF_AUTOSTART_FLAG)||(startUpFlags&UI_MAIN_STARTUPFLAG_RTC)){
-                        searchFlags&=~FF_AUTOSTART_FLAG;//autostart only once for an enterd folder
+                    if(startUpFlags&UI_MAIN_STARTUPFLAG_RTC){
                         startUpFlags&=~UI_MAIN_STARTUPFLAG_RTC;
                         mainSM=UI_MAIN_RUN_SM_PLAY_INIT;
                     }
@@ -650,6 +679,14 @@ char UI_MAIN_pcWriteBuffer[2048];
                         if((currentPlaySecond==0)&&(currentPlayMinute==0)) currentPlayOffset=0;
                         UI_MAIN_sdPlayMsgSend.filePos=FORMAT_HELPER_getFilePosByPlayTimeAndExtension(currentPlaySecond,currentPlayMinute,&UI_MAIN_selectedFileName[0],currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,currentPlayChannels);
                         SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume);
+                        SD_PLAY_setPlaySpeed(currentPlaySpeed);
+                        if(currentPlaySpeed>200){
+                            UI_MAIN_cpuFull();
+                        }else if(currentPlaySpeed>100){
+                            UI_MAIN_cpuMiddle();
+                        }else{
+                            UI_MAIN_cpuNormal();
+                        }
                         ESP_LOGI(UI_MAIN_LOG_TAG,"Trying to play %s at position %llu",UI_MAIN_sdPlayMsgSend.msgData,UI_MAIN_sdPlayMsgSend.filePos);
                         SD_PLAY_sendMessage(&UI_MAIN_sdPlayMsgSend,100);
                         lastAutoSave=esp_timer_get_time();
@@ -667,10 +704,14 @@ char UI_MAIN_pcWriteBuffer[2048];
                     break;
             case UI_MAIN_RUN_SM_PLAYING:
                     if(!UI_ELEMENTS_isDisplayOff()){
-                        if(((now-lastVolumeChangedTime)/1000)<1000){
-                            SCREENS_volumeChange(UI_MAIN_volume);
+                        if(((now-lastPlayOverlayChangedTime)/1000)<2000){
+                            SCREENS_playOverlay(playOverlayMode,UI_MAIN_volume,currentPlaySpeed,currentEqualizer,currentRepeatMode);
                         }else{
-                            SCREENS_play(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],currentPlayMinute,currentPlaySecond,percent,searchFlags,allPlayMinute,allPlaySecond,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
+                            playOverlayActive=false;
+                            if(((now-lastPlayOverlayChangedTime)/1000)>10000){//wait longer for the overlay to switch back to volume setting first
+                                playOverlayMode=0;
+                            }
+                            SCREENS_play(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],currentPlayMinute,currentPlaySecond,percent,currentRepeatMode,allPlayMinute,allPlaySecond,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
                         }
                     }
                     QueueHandle_t rx=NULL;
@@ -696,7 +737,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                     mainSM=UI_MAIN_RUN_SM_PLAY_INIT;
                                     if(selectedFile>UI_MAIN_amountOfFiles){//book finished, reset everything to start
                                         selectedFile=1;
-                                        if(searchFlags&FF_REPEAT_FLAG){
+                                        if(currentRepeatMode&UI_MAIN_REPEAT_FOLDER){
                                             mainSM=UI_MAIN_RUN_SM_PLAY_INIT;//go on if we should repeat
                                         }else{
                                             mainSM=UI_MAIN_RUN_SM_PAUSED;
@@ -730,37 +771,109 @@ char UI_MAIN_pcWriteBuffer[2048];
                         }
                         if((rx==UI_MAIN_keyQueue)&&(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(5)) == pdPASS )){//wait for incoming key messages
                             if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
-                                if((now-lastVolumeChangedTime)>50000){
-                                    if(UI_MAIN_volume>=0) UI_MAIN_volume-=5;
-                                }else{
-                                    if(UI_MAIN_volume>=0) UI_MAIN_volume-=100;
+                                if(playOverlayActive){//first turn should not already do some action
+                                    switch(playOverlayMode){
+                                        case 0:
+                                                    if((now-lastPlayOverlayChangedTime)>50000){
+                                                        if(UI_MAIN_volume>=0) UI_MAIN_volume-=5;
+                                                    }else{
+                                                        if(UI_MAIN_volume>=0) UI_MAIN_volume-=100;
+                                                    }
+                                                    if(UI_MAIN_volume<0) UI_MAIN_volume=0;
+                                                    if(UI_MAIN_volume>10000) UI_MAIN_volume=10000;
+                                                    SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume);
+                                                    break;
+                                        case 1:
+                                                    if(currentPlaySpeed>50){
+                                                        currentPlaySpeed-=5;
+                                                    }
+                                                    SD_PLAY_setPlaySpeed(currentPlaySpeed);
+                                                    if(currentPlaySpeed>200){
+                                                        UI_MAIN_cpuFull();
+                                                    }else if(currentPlaySpeed>100){
+                                                        UI_MAIN_cpuMiddle();
+                                                    }else{
+                                                        UI_MAIN_cpuNormal();
+                                                    }
+                                                    break;
+                                        case 2:     if(currentEqualizer>0){
+                                                        currentEqualizer--;
+                                                    }
+                                                    SD_PLAY_setEqualizer(currentEqualizer);
+                                                    break;
+                                        case 3:     if(currentRepeatMode&UI_MAIN_REPEAT_FOLDER){
+                                                        currentRepeatMode&=~UI_MAIN_REPEAT_FOLDER;
+                                                    }else{
+                                                        currentRepeatMode|=UI_MAIN_REPEAT_FOLDER;
+                                                    }
+                                                    break;
+                                    }
                                 }
-                                if(UI_MAIN_volume<0) UI_MAIN_volume=0;
-                                if(UI_MAIN_volume>10000) UI_MAIN_volume=10000;
-                                SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume);
-                                lastVolumeChangedTime=now;
+                                lastPlayOverlayChangedTime=now;playOverlayActive=true;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
-                                if((now-lastVolumeChangedTime)>50000){
-                                    if(UI_MAIN_volume<=10000) UI_MAIN_volume+=5;
-                                }else{
-                                    if(UI_MAIN_volume<=10000) UI_MAIN_volume+=100;
+                                if(playOverlayActive){//first turn should not already do some action
+                                    switch(playOverlayMode){
+                                        case 0:
+                                                    if((now-lastPlayOverlayChangedTime)>50000){
+                                                        if(UI_MAIN_volume<=10000) UI_MAIN_volume+=5;
+                                                    }else{
+                                                        if(UI_MAIN_volume<=10000) UI_MAIN_volume+=100;
+                                                    }
+                                                    if(UI_MAIN_volume<0) UI_MAIN_volume=0;
+                                                    if(UI_MAIN_volume>10000) UI_MAIN_volume=10000;
+                                                    SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume);
+                                                    break;
+                                        case 1:
+                                                    if(currentPlaySpeed<250){
+                                                        currentPlaySpeed+=5;
+                                                    }
+                                                    SD_PLAY_setPlaySpeed(currentPlaySpeed);
+                                                    if(currentPlaySpeed>200){
+                                                        UI_MAIN_cpuFull();
+                                                    }else if(currentPlaySpeed>100){
+                                                        UI_MAIN_cpuMiddle();
+                                                    }else{
+                                                        UI_MAIN_cpuNormal();
+                                                    }
+                                                    break;
+                                        case 2:     if(currentEqualizer<6){
+                                                        currentEqualizer++;
+                                                    }
+                                                    SD_PLAY_setEqualizer(currentEqualizer);
+                                                    break;
+                                        case 3:     if(currentRepeatMode&UI_MAIN_REPEAT_FOLDER){
+                                                        currentRepeatMode&=~UI_MAIN_REPEAT_FOLDER;
+                                                    }else{
+                                                        currentRepeatMode|=UI_MAIN_REPEAT_FOLDER;
+                                                    }
+                                                    break;
+                                    }
                                 }
-                                if(UI_MAIN_volume<0) UI_MAIN_volume=0;
-                                if(UI_MAIN_volume>10000) UI_MAIN_volume=10000;
-                                SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume);
-                                lastVolumeChangedTime=now;
+                                lastPlayOverlayChangedTime=now;playOverlayActive=true;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
-                                UI_MAIN_sdPlayMsgSend.msgType=SD_PLAY_MSG_TYPE_STOP_PLAY;
-                                SD_PLAY_sendMessage(&UI_MAIN_sdPlayMsgSend,100);
-                                pauseMode=1;
+                                if(playOverlayActive){
+                                    if(playOverlayMode<3){
+                                        playOverlayMode++;
+                                        //if(playOverlayMode==2) playOverlayMode=3; //for now skip equalizer mode
+                                    }else{
+                                        playOverlayMode=0;
+                                    }
+                                    lastPlayOverlayChangedTime=now;playOverlayActive=true;
+                                }else{
+                                    UI_MAIN_sdPlayMsgSend.msgType=SD_PLAY_MSG_TYPE_STOP_PLAY;
+                                    SD_PLAY_sendMessage(&UI_MAIN_sdPlayMsgSend,100);
+                                    pauseMode=1;
+                                }
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                                 UI_MAIN_sdPlayMsgSend.msgType=SD_PLAY_MSG_TYPE_STOP_PLAY;
                                 SD_PLAY_sendMessage(&UI_MAIN_sdPlayMsgSend,100);
                                 pauseMode=0;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                                UI_MAIN_sdPlayMsgSend.msgType=SD_PLAY_MSG_TYPE_STOP_PLAY;
-                                SD_PLAY_sendMessage(&UI_MAIN_sdPlayMsgSend,100);
-                                skipped=1;
+                                if(!playOverlayActive){
+                                    UI_MAIN_sdPlayMsgSend.msgType=SD_PLAY_MSG_TYPE_STOP_PLAY;
+                                    SD_PLAY_sendMessage(&UI_MAIN_sdPlayMsgSend,100);
+                                    skipped=1;
+                                }
                             }
                         }
 
@@ -793,6 +906,9 @@ char UI_MAIN_pcWriteBuffer[2048];
                         UI_MAIN_saveState.playBlockSize=currentPlayBlockSize;
                         UI_MAIN_saveState.playBitrate=currentPlayBitrate;
                         UI_MAIN_saveState.playChannels=currentPlayChannels;
+                        UI_MAIN_saveState.playSpeed=currentPlaySpeed;
+                        UI_MAIN_saveState.equalizer=currentEqualizer;
+                        UI_MAIN_saveState.repeatMode=currentRepeatMode;
                         strcpy(&UI_MAIN_saveState.fileName[0],&UI_MAIN_selectedFileName[0]);
                         SAVES_saveBookmark(&UI_MAIN_selectedFolderName[0],&UI_MAIN_saveState);
                         UI_MAIN_settings.volume=UI_MAIN_volume;
