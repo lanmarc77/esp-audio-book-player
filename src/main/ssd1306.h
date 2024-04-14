@@ -60,6 +60,14 @@ ssd1306_handle_t ssd1306_create(i2c_port_t port, uint16_t dev_addr);
 void ssd1306_delete(ssd1306_handle_t dev);
 
 /**
+ * @brief   rotates the screen by 180°C
+ *
+ * @param   dev object handle of ssd1306
+ * @param   rotate 0=normal, 1=rotated
+ */
+esp_err_t ssd1306_rotate(ssd1306_handle_t dev,uint8_t rotate);
+
+/**
  * @brief   draw point on (x, y)
  *
  * @param   dev object handle of ssd1306

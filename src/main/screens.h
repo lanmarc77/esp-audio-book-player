@@ -34,6 +34,9 @@ void SCREENS_fwUpgradeInit(uint8_t major,uint8_t minor,uint8_t patch,int8_t time
 void SCREENS_fwUpgradeRunning(int8_t percent);
 void SCREENS_switchingOff(uint64_t sdSizeMB,uint8_t SPIFFSUsagePercent);
 void SCREENS_sleepTimer(uint32_t secondsLeft);
-void SCREENS_wakeupTimer(uint64_t secondsTime);
+void SCREENS_wakeupTimer(uint64_t secondsTime,uint8_t blinkMode);
+void SCREENS_screenSetup(uint8_t rotation,uint8_t blinkMode);
+void SCREENS_rotDirSetup(uint8_t dir,uint8_t blinkMode);
+void SCREENS_rotSpeedSetup(uint8_t speed,uint8_t blinkMode);
 
 #endif

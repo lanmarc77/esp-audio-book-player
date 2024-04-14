@@ -242,7 +242,7 @@ void UI_MAIN_setWakeupTimer(uint64_t timer){
 #define UI_MAIN_RUN_SM_INIT 0
 #define UI_MAIN_RUN_SM_FOLDER_SCAN 5
 #define UI_MAIN_RUN_SM_FOLDER_SELECTION 10
-#define UI_MAIN_RUN_SM_WAKEUP_TIMER_SETUP 12
+#define UI_MAIN_RUN_SM_SETUP_MENU 13
 #define UI_MAIN_RUN_SM_BOOK_SCAN 15 
 #define UI_MAIN_RUN_SM_PAUSED 20
 #define UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP 22
@@ -261,7 +261,7 @@ char UI_MAIN_pcWriteBuffer[2048];
   * 
   */
  void UI_MAIN_run(uint8_t startUpFlags){
-    uint8_t mainSM=0;
+    uint8_t mainSM=UI_MAIN_RUN_SM_INIT;
     uint8_t pauseMode=0;
     uint16_t selectedFolder=0;
     uint16_t selectedFile=1;
@@ -288,7 +288,6 @@ char UI_MAIN_pcWriteBuffer[2048];
     bool playOverlayActive=false;
     uint64_t sleepTimeOffTime=0;//the timestamp when the currently setup sleeptime is reached
     uint32_t sleepTimeSetupS=UI_MAIN_DEFAULT_SLEEP_TIME_S;//the setup sleeptime
-    uint64_t wakeupTimeSetupS=3600;
     uint16_t newPlayMinute=0;
     uint64_t newPlayPosition=0;
     uint8_t saveFlag=0;
@@ -368,6 +367,21 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 UI_MAIN_searchString=&UI_MAIN_settings.lastFolderName[0];
                                 UI_MAIN_searchId=&searchId;
                             }
+                            if(UI_MAIN_settings.screenRotation){
+                                UI_ELEMENTS_rotate(1);
+                            }else{
+                                UI_ELEMENTS_rotate(0);
+                            }
+                            if(UI_MAIN_settings.rotaryEncoderSpeed){
+                                rotary_encoder_set_speed(1);
+                            }else{
+                                rotary_encoder_set_speed(0);
+                            }
+                            if(UI_MAIN_settings.rotaryEncoderDirection){
+                                rotary_encoder_set_direction(1);
+                            }else{
+                                rotary_encoder_set_direction(0);
+                            }
                         }
                         xTaskCreate(UI_MAIN_scanSortTaskAllBooks, "UI_MAIN_scanSortTaskAllBooks", 1024 * 5, NULL,  uxTaskPriorityGet(NULL), NULL);
                     }else{
@@ -444,7 +458,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                             xTaskCreate(UI_MAIN_scanSortTaskOneBook, "UI_MAIN_scanSortTaskOneBook", 1024 * 5, NULL,  uxTaskPriorityGet(NULL), NULL);
                             mainSM=UI_MAIN_RUN_SM_BOOK_SCAN;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                            mainSM=UI_MAIN_RUN_SM_WAKEUP_TIMER_SETUP;
+                            mainSM=UI_MAIN_RUN_SM_SETUP_MENU;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){//TODO: go to a settings screen/setup, switch off for now
                             SCREENS_switchingOff(SD_CARD_getSize(),SAVES_getUsedSpaceLevel());
                             if(UI_MAIN_isImagePersisted()==0){
@@ -455,43 +469,9 @@ char UI_MAIN_pcWriteBuffer[2048];
                         }
                     }
                     break;
-            case UI_MAIN_RUN_SM_WAKEUP_TIMER_SETUP:
-                    SCREENS_wakeupTimer(wakeupTimeSetupS);
-                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
-                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
-                            if((now-lastMinuteChangedTime)>50000){
-                                if(wakeupTimeSetupS>60){
-                                    wakeupTimeSetupS-=60;
-                                }else{
-                                    wakeupTimeSetupS=60;
-                                }
-                            }else{
-                                if(wakeupTimeSetupS>60*5){
-                                    wakeupTimeSetupS-=60*5;
-                                }else{
-                                    wakeupTimeSetupS=60;
-                                }
-                            }
-                            if(wakeupTimeSetupS<60) wakeupTimeSetupS=60;
-                            lastMinuteChangedTime=now;
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
-                            if((now-lastMinuteChangedTime)>50000){
-                                wakeupTimeSetupS+=60;
-                            }else{
-                                wakeupTimeSetupS+=60*5;
-                            }
-                            if(wakeupTimeSetupS>3600*24) wakeupTimeSetupS=3600*24;
-                            lastMinuteChangedTime=now;
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
-                            UI_MAIN_setWakeupTimer(wakeupTimeSetupS);
-                            mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
-                            UI_MAIN_setWakeupTimer(0);
-                            mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                            UI_MAIN_setWakeupTimer(0);
-                            mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
-                        }
+            case UI_MAIN_RUN_SM_SETUP_MENU:
+                    if(UI_MAIN_setupMenu()!=0){
+                        mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                     }
                     break;                    
             case UI_MAIN_RUN_SM_BOOK_SCAN:
@@ -972,6 +952,215 @@ void UI_MAIN_getFWupgradeFile(char* fwFileName,uint8_t* major,uint8_t* minor,uin
     ESP_LOGI(UI_MAIN_LOG_TAG, "No new firmware detected.");
 }
 
+typedef struct UI_MAIN_setupMenuDataStruct{
+    uint8_t sm;
+    uint8_t selectedSub;
+    uint64_t lastMinuteChangedTime;
+    uint64_t wakeupTimeSetupS;
+}UI_MAIN_setupMenuData_t;
+UI_MAIN_setupMenuData_t UI_MAIN_setupMenuData;
+
+#define UI_MAIN_SETUP_MENU_SM_INIT 0
+#define UI_MAIN_SETUP_MENU_SUB_SELECTION 5
+#define UI_MAIN_SETUP_MENU_SM_WAKEUP_TIMER 10
+#define UI_MAIN_SETUP_MENU_SM_SCREEN_SETUP 15
+#define UI_MAIN_SETUP_MENU_SM_ROT_DIR 20
+#define UI_MAIN_SETUP_MENU_SM_ROT_SPEED 25
+#define UI_MAIN_SETUP_MENU_SM_CLEANUP 250
+
+/**
+  * @brief displays and handles all the setup menu settings
+  * 
+  * @return 0=setup still busy, >0= setup finished
+  *
+  */
+uint8_t UI_MAIN_setupMenu(){
+    uint64_t now=esp_timer_get_time(); //make now available for all states of the state machine
+    UI_MAIN_keyMessages_t keyMessage;
+    switch(UI_MAIN_setupMenuData.sm){
+        case UI_MAIN_SETUP_MENU_SM_INIT:
+                    UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                    UI_MAIN_setupMenuData.lastMinuteChangedTime=esp_timer_get_time()-5*1000000;
+                    memset(&keyMessage,0,sizeof(UI_MAIN_keyMessages_t));
+                    break;
+        case UI_MAIN_SETUP_MENU_SUB_SELECTION:
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            if(UI_MAIN_setupMenuData.selectedSub==0){
+                                UI_MAIN_setupMenuData.selectedSub=3;
+                            }else{
+                                UI_MAIN_setupMenuData.selectedSub--;
+                            }
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            if(UI_MAIN_setupMenuData.selectedSub==3){
+                                UI_MAIN_setupMenuData.selectedSub=0;
+                            }else{
+                                UI_MAIN_setupMenuData.selectedSub++;
+                            }
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            switch(UI_MAIN_setupMenuData.selectedSub){
+                                case 0: //wakeup timer
+                                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_WAKEUP_TIMER;
+                                        break;
+                                case 1: //screen rotation
+                                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_SCREEN_SETUP;
+                                        break;
+                                case 2: //rotary encoder direction
+                                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_ROT_DIR;
+                                        break;
+                                case 3: //rotary encoder speed
+                                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_ROT_SPEED;
+                                        break;
+                            }
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_CLEANUP;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_CLEANUP;
+                        }
+                    }
+                    switch(UI_MAIN_setupMenuData.selectedSub){
+                        case 0: //wakeup timer
+                                SCREENS_wakeupTimer(UI_MAIN_setupMenuData.wakeupTimeSetupS,0);
+                                break;
+                        case 1: //screen rotation
+                                SCREENS_screenSetup(UI_MAIN_settings.screenRotation,0);
+                                break;
+                        case 2: //rotary encoder direction
+                                SCREENS_rotDirSetup(UI_MAIN_settings.rotaryEncoderDirection,0);
+                                break;
+                        case 3: //rotary encoder speed
+                                SCREENS_rotSpeedSetup(UI_MAIN_settings.rotaryEncoderSpeed,0);
+                                break;
+                    }
+                    UI_ELEMENTS_numberSelect(0,0,UI_MAIN_setupMenuData.selectedSub+1,4,1);
+                    UI_ELEMENTS_update();
+                    break;
+        case UI_MAIN_SETUP_MENU_SM_WAKEUP_TIMER:
+                    SCREENS_wakeupTimer(UI_MAIN_setupMenuData.wakeupTimeSetupS,1);
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            if((now-UI_MAIN_setupMenuData.lastMinuteChangedTime)>50000){
+                                if(UI_MAIN_setupMenuData.wakeupTimeSetupS>60){
+                                    UI_MAIN_setupMenuData.wakeupTimeSetupS-=60;
+                                }else{
+                                    UI_MAIN_setupMenuData.wakeupTimeSetupS=60;
+                                }
+                            }else{
+                                if(UI_MAIN_setupMenuData.wakeupTimeSetupS>60*5){
+                                    UI_MAIN_setupMenuData.wakeupTimeSetupS-=60*5;
+                                }else{
+                                    UI_MAIN_setupMenuData.wakeupTimeSetupS=60;
+                                }
+                            }
+                            if(UI_MAIN_setupMenuData.wakeupTimeSetupS<60) UI_MAIN_setupMenuData.wakeupTimeSetupS=60;
+                            UI_MAIN_setupMenuData.lastMinuteChangedTime=now;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            if((now-UI_MAIN_setupMenuData.lastMinuteChangedTime)>50000){
+                                UI_MAIN_setupMenuData.wakeupTimeSetupS+=60;
+                            }else{
+                                UI_MAIN_setupMenuData.wakeupTimeSetupS+=60*5;
+                            }
+                            if(UI_MAIN_setupMenuData.wakeupTimeSetupS>3600*24) UI_MAIN_setupMenuData.wakeupTimeSetupS=3600*24;
+                            UI_MAIN_setupMenuData.lastMinuteChangedTime=now;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            UI_MAIN_setWakeupTimer(UI_MAIN_setupMenuData.wakeupTimeSetupS);
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setWakeupTimer(0);
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setWakeupTimer(0);
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    break;
+        case UI_MAIN_SETUP_MENU_SM_SCREEN_SETUP:
+                    SCREENS_screenSetup(UI_MAIN_settings.screenRotation,1);
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            if(UI_MAIN_settings.screenRotation){
+                                UI_MAIN_settings.screenRotation=0;
+                            }else{
+                                UI_MAIN_settings.screenRotation=1;
+                            }
+                            UI_ELEMENTS_rotate(UI_MAIN_settings.screenRotation);
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            if(UI_MAIN_settings.screenRotation){
+                                UI_MAIN_settings.screenRotation=0;
+                            }else{
+                                UI_MAIN_settings.screenRotation=1;
+                            }
+                            UI_ELEMENTS_rotate(UI_MAIN_settings.screenRotation);
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    break;
+        case UI_MAIN_SETUP_MENU_SM_ROT_DIR:
+                    SCREENS_rotDirSetup(UI_MAIN_settings.rotaryEncoderDirection,1);
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            if(UI_MAIN_settings.rotaryEncoderDirection){
+                                UI_MAIN_settings.rotaryEncoderDirection=0;
+                            }else{
+                                UI_MAIN_settings.rotaryEncoderDirection=1;
+                            }
+                            rotary_encoder_set_direction(UI_MAIN_settings.rotaryEncoderDirection);
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            if(UI_MAIN_settings.rotaryEncoderDirection){
+                                UI_MAIN_settings.rotaryEncoderDirection=0;
+                            }else{
+                                UI_MAIN_settings.rotaryEncoderDirection=1;
+                            }
+                            rotary_encoder_set_direction(UI_MAIN_settings.rotaryEncoderDirection);
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    break;
+        case UI_MAIN_SETUP_MENU_SM_ROT_SPEED:
+                    SCREENS_rotSpeedSetup(UI_MAIN_settings.rotaryEncoderSpeed,1);
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            if(UI_MAIN_settings.rotaryEncoderSpeed){
+                                UI_MAIN_settings.rotaryEncoderSpeed=0;
+                            }else{
+                                UI_MAIN_settings.rotaryEncoderSpeed=1;
+                            }
+                            rotary_encoder_set_speed(UI_MAIN_settings.rotaryEncoderSpeed);
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            if(UI_MAIN_settings.rotaryEncoderSpeed){
+                                UI_MAIN_settings.rotaryEncoderSpeed=0;
+                            }else{
+                                UI_MAIN_settings.rotaryEncoderSpeed=1;
+                            }
+                            rotary_encoder_set_speed(UI_MAIN_settings.rotaryEncoderSpeed);
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    break;
+        case UI_MAIN_SETUP_MENU_SM_CLEANUP:
+                    UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_INIT;
+                    SAVES_saveSettings(&UI_MAIN_settings);
+                    return 1;
+                    break;
+    }
+    return 0;
+}
+
 /**
   * @brief checks if the current running firmware image is persisted
   *
@@ -1158,6 +1347,8 @@ void UI_MAIN_init(){
     UI_MAIN_scanQueueOut=xQueueCreate(1, sizeof(int32_t));
     UI_MAIN_scanQueueIn=xQueueCreate(1, sizeof(int32_t));
     UI_MAIN_keysAndPlay = xQueueCreateSet(100);
+    memset(&UI_MAIN_setupMenuData,0,sizeof(UI_MAIN_setupMenuData_t));
+    UI_MAIN_setupMenuData.wakeupTimeSetupS=3600;
     vTaskDelay(pdMS_TO_TICKS(1000));//let the rotary encoder get first valid values and to let the user see the init screen
     uint8_t cnt=0;
     do{
@@ -1179,7 +1370,7 @@ void UI_MAIN_init(){
         UI_ELEMENTS_cls();
         UI_ELEMENTS_mainSymbol(11);
         UI_ELEMENTS_update();
-        ESP_LOGE(UI_MAIN_LOG_TAG,"Resetting config.");
+        ESP_LOGW(UI_MAIN_LOG_TAG,"Resetting config.");
         SAVES_spiffsFormat();
     }
     SAVES_init();

@@ -178,6 +178,10 @@ esp_err_t rotary_encoder_reset(rotary_encoder_info_t * info);
 
 uint8_t rotary_encoder_switch_state();
 
+void rotary_encoder_set_direction(uint8_t dir);
+void rotary_encoder_set_speed(uint8_t speed);
+uint8_t rotary_encoder_get_direction();
+uint8_t rotary_encoder_get_speed();
 
 #ifdef __cplusplus
 }

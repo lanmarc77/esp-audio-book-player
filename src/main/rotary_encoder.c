@@ -167,8 +167,60 @@ static uint8_t _process(rotary_encoder_info_t * info)
     return event;
 }
 
-
+uint8_t rotary_encoder_use_dir_flip=0;
+uint8_t rotary_encoder_use_skip=0;
+uint8_t rotary_encoder_cw_skip=0;
+uint8_t rotary_encoder_ccw_skip=0;
 uint8_t rotary_encoder_lastDirection=0;
+
+void rotary_encoder_set_direction(uint8_t dir){
+    if(dir){
+        rotary_encoder_use_dir_flip=1;
+    }else{
+        rotary_encoder_use_dir_flip=0;
+    }
+}
+
+void rotary_encoder_set_speed(uint8_t speed){
+    if(speed){
+        rotary_encoder_use_skip=1;
+    }else{
+        rotary_encoder_use_skip=0;
+    }
+}
+
+uint8_t rotary_encoder_get_direction(){
+    return rotary_encoder_use_dir_flip;
+}
+uint8_t rotary_encoder_get_speed(){
+    return rotary_encoder_use_skip;
+}
+
+
+static void _isr_get_direction(rotary_encoder_info_t* info,uint8_t* event){
+    switch(*event){
+        case DIR_CW:
+                if(rotary_encoder_use_dir_flip){
+                    --info->state.position;
+                    info->state.direction = ROTARY_ENCODER_DIRECTION_COUNTER_CLOCKWISE;
+                }else{
+                    ++info->state.position;
+                    info->state.direction = ROTARY_ENCODER_DIRECTION_CLOCKWISE;
+                }
+                break;
+        case DIR_CCW:
+                if(rotary_encoder_use_dir_flip){
+                    ++info->state.position;
+                    info->state.direction = ROTARY_ENCODER_DIRECTION_CLOCKWISE;
+                }else{
+                    --info->state.position;
+                    info->state.direction = ROTARY_ENCODER_DIRECTION_COUNTER_CLOCKWISE;
+                }
+                break;
+        default:break;
+    }
+}
+
 static void _isr_rotenc(void * args)
 {
     rotary_encoder_info_t * info = (rotary_encoder_info_t *)args;
@@ -177,25 +229,45 @@ static void _isr_rotenc(void * args)
 
     switch (event)
     {
-    case DIR_CW:
-        ++info->state.position;
-        info->state.direction = ROTARY_ENCODER_DIRECTION_CLOCKWISE;
-        send_event = true;
-        break;
-    case DIR_CCW:
-        --info->state.position;
-        info->state.direction = ROTARY_ENCODER_DIRECTION_COUNTER_CLOCKWISE;
-        send_event = true;
+        case DIR_CW:
+            if(rotary_encoder_use_skip==0){
+                _isr_get_direction(info,&event);
+                send_event = true;
+            }else{
+                rotary_encoder_ccw_skip=0;
+                rotary_encoder_cw_skip++;
+                if(rotary_encoder_cw_skip>=4){
+                    _isr_get_direction(info,&event);
+                    send_event = true;
+                    rotary_encoder_cw_skip=0;
+                }
+            }
+            break;
+        case DIR_CCW:
+            if(rotary_encoder_use_skip==0){
+                _isr_get_direction(info,&event);
+                send_event = true;
+            }else{
+                rotary_encoder_cw_skip=0;
+                rotary_encoder_ccw_skip++;
+                if(rotary_encoder_ccw_skip>=4){
+                    _isr_get_direction(info,&event);
+                    send_event = true;
+                    rotary_encoder_ccw_skip=0;
+                }
+        }
         break;
     default:
         break;
     }
-    if((event==DIR_CW)||(event==DIR_CCW)){
-        if(rotary_encoder_lastDirection==event){
-            rotary_encoder_lastDirection=0;
-            send_event=false;
-        }else{
-            rotary_encoder_lastDirection=event;
+    if(rotary_encoder_use_skip==0){
+        if((event==DIR_CW)||(event==DIR_CCW)){
+            if(rotary_encoder_lastDirection==event){
+                rotary_encoder_lastDirection=0;
+                send_event=false;
+            }else{
+                rotary_encoder_lastDirection=event;
+            }
         }
     }
 

@@ -279,6 +279,21 @@ void UI_ELEMENTS_mainSymbol(uint8_t symbol){
         SSD1306_printStr(0,1,"(-_-)  ->  (o_o)");
         SSD1306_printStr(0,2,"                ");
         SSD1306_printStr(0,3,"                ");
+    }else if(symbol==17){//screen rotation
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1,"   -------->    ");
+        SSD1306_printStr(0,2,"  |   ???   |   ");
+        SSD1306_printStr(0,3,"   <--------    ");
+    }else if(symbol==18){//rotary encoder direction
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1," o o            ");
+        SSD1306_printStr(0,2,"o   o           ");
+        SSD1306_printStr(0,3," o o            ");
+    }else if(symbol==19){//rotary encoder speed
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1," o o            ");
+        SSD1306_printStr(0,2,"o   o           ");
+        SSD1306_printStr(0,3," o o            ");
     }
 }
 
@@ -571,6 +586,16 @@ void UI_ELEMENTS_displayOff(){
 void UI_ELEMENTS_init(){
     SSD1306_init();
     SSD1306_cls();
+}
+
+/**
+  * @brief rotates the screen by 180°
+  * 
+  * @param rotate 0=normal,1=rotate
+  *
+  */
+ void UI_ELEMENTS_rotate(uint8_t rotate){
+    ssd1306_rotate(SSD1306_dev,rotate);
 }
 
 #endif

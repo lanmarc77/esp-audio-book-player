@@ -297,6 +297,17 @@ void ssd1306_draw_line(ssd1306_handle_t dev, int16_t chXpos1, int16_t chYpos1, i
     }
 }
 
+esp_err_t ssd1306_rotate(ssd1306_handle_t dev,uint8_t rotate){
+    if(rotate){
+        ssd1306_write_cmd_byte(dev, 0xA1); //--Set SEG/Column Mapping
+        ssd1306_write_cmd_byte(dev, 0xC0); //Set COM/Row Scan Direction normal
+    }else{
+        ssd1306_write_cmd_byte(dev, 0xA0); //--Set SEG/Column Mapping
+        ssd1306_write_cmd_byte(dev, 0xC8); //Set COM/Row Scan Direction remap
+    }
+    return ESP_OK;
+}
+
 esp_err_t ssd1306_init(ssd1306_handle_t dev)
 {
     esp_err_t ret;
