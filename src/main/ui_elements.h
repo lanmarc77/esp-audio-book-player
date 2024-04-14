@@ -25,7 +25,7 @@
 */
 #define FW_MAJOR 00
 #define FW_MINOR 00
-#define FW_PATCH 06
+#define FW_PATCH 07
 
 void UI_ELEMENTS_init();
 void UI_ELEMENTS_textScrolly(uint8_t x,uint8_t y, uint8_t length, char *string);
@@ -46,5 +46,6 @@ void UI_ELEMENTS_playSpeed(uint16_t playSpeed);
 void UI_ELEMENTS_equalizer(uint8_t equalizer);
 void UI_ELEMENTS_repeatMode(uint8_t repeatMode);
 void UI_ELEMENTS_sleepTimeLeft(uint32_t secondsLeft);
+void UI_ELEMENTS_rotate(uint8_t rotate);
 
 #endif

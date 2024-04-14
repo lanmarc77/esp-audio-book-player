@@ -4,7 +4,7 @@ TINAMP: **T**his **I**s **N**ot **A** **M**usic **P**layer.
 This is a device that is meant to play non-DRM audio books from an SD card and has the following features:  
 
 - folder based audio book player, one folder contains all files of one audio book
-- multiple audio books supported (currently max. 9999 on one SD card)
+- multiple audio books supported (currently max. 9999 on one SD card with presorted index)
 - sorting of audio book names and audio book files by ASCII name (see limitations of sorting below)
 - saves audio book listening position and resumes for each audio book
 - supports huge single file audio books, e.g. a 20hrs long singe file audio book
@@ -134,6 +134,8 @@ which order you solder the wires as you might not get to them anymore.
   
 ## Buyable manufactured PCB
 WIP: One or two PCB layouts as motherboard for a 3D printed base case and a worldwide buyable case.  
+First prototype PCB:  
+![image](pictures/pcb_prototype_v09.jpg)  
   
 ## Printed/buyable case
 WIP: 3D case model  
@@ -269,19 +271,38 @@ AC=any type of click
   |     |        |                                                 |
   |     |         ------------------------------------------------>|
   |     |                                                          |
-  |     v                                                          v
-  |  sleep timer                                              wakeup timer
-  |  setup screen                                             setup screen
-  |  |           |                                            |           |
-  |  | SC        | any other click                            | SC        | any other click
-  |  | activate  | timer not                                  | activate  | timer not
-  |  | timer     | activated                                  | timer     | activated
-  |<-            |                                            |           |
-  |              |                                             ----- -----
-   --------------                                                   |
-                                                                    v
-                                                           back to corresponding
-                                                               pause screen
+  |     |                                                          v
+  |     |                                                      sleep timer
+  |     |                                                     setup screen
+  |     |                                                     |           |
+  |     |                                                     | SC        | any other click
+  |     |                                                     | activate  | timer not
+  |     |                                                     | timer     | activated
+  |     |                                                     |           |
+  |     |                                                      ----- -----
+  |     |                                                           |
+  |     |                                                           v
+  |     |                                                    back to originating
+  |     |                                                      pause screen
+  |      -----------------
+  |                       |          next settings
+  |      LC               v             screen
+   ---------------- global settings <--------------
+                      ^   |     |           rotate |
+                      |   | SC   ------------------
+      ----------------    |
+     |                    |
+     |                    v                change value
+     |           any chosen setup screen <--------------
+     |           |              |  |            rotate  |
+     |           | SC           |   --------------------
+     |           |              |
+     |           |              | any other
+     |           | for wakeup   | click
+     |           | timer:       | for wakeup timer:
+     |           | activated    | deactivated
+     |           v              |
+      --------------------------
 
 ```
 
@@ -453,7 +474,7 @@ The value 3m is only displayed if a sleep timer was setup and activated and show
 The progress bar at the bottom shows the progress within the current chapter.  
 On right side the battery level in percent is shown.  
   
-### Play overlay screen
+#### Play overlay screen
 ```
      volume               play speed
  ----------------      ----------------  
@@ -472,7 +493,7 @@ On right side the battery level in percent is shown.
 |                |    |                |
  ----------------      ----------------
 ```
-The play overlay screen is activated when a file is played and rotation is used. If it is active a short click
+The play overlay screen is activated when a file is played and the rotary encoder is turned. If it is active a short click
 is going through the different settings. This screen will automatically switch back to the play screen after 2s of
 no user input but will remember for 8 more seconds at which sub menu it was left.  
   
@@ -499,17 +520,6 @@ for each audio book.
 ```
 Using rotation the sleep timer can be setup from 1 minute to 99 minutes in minute precision.  
   
-### Wake up timer setup screen
-```
- ----------------
-|                |
-|(-_-)  ->  (o_o)|
-|                |
-|      01:00     |
- ----------------
-```
-Using rotation the sleep timer can be setup from 1 minute to to 24 hours in minute precision.  
-  
 ### Low battery screen
 ```
  ----------------
@@ -519,7 +529,7 @@ Using rotation the sleep timer can be setup from 1 minute to to 24 hours in minu
 |     |####|     |
  ----------------
 ```
-On right side the battery level in percent is shown.  
+On the right side the battery level in percent is shown.  
   
 ### Off screen
 ```
@@ -532,6 +542,79 @@ On right side the battery level in percent is shown.
 ```
 Also shows the size of the detected SD card and the used space of the bookmark storage in the SPIFFS
 of the ESP32.  
+  
+### Global settings/functionality
+```
+   wakeup timer         screen rotation
+ ----------------      ----------------  
+|       1/4      |    |       2/4      |
+|(-_-)  ->  (o_o)| -> |   -------->    |
+|                |    |  |    0    |   |
+|      01:00     |    |   <--------    |
+ ----------------      ----------------
+        ^                     |
+        |                     v
+  rotary encoder        rotary encoder
+      speed                direction
+ ----------------      ----------------  
+|       4/4      |    |       3/4      |
+| o o            | <- | o o            |
+|o   o     x1    |    |o   o    -->+   |
+| o o            |    | o o            |
+ ----------------      ----------------
+```
+After entering the global settings the rotary knob can be used to select the setting to change.  
+A short click will enter the specific setting selected.  
+On top a counter for all settings is shown.  
+If this menu is left with a long click all settings that are saveable are saved.  
+  
+#### Wake up timer setup screen
+```
+ ----------------
+|                |
+|(-_-)  ->  (o_o)|
+|                |
+|      01:00     |
+ ----------------
+```
+Using rotation the sleep timer can be setup from 1 minute to to 24 hours in minute precision.  
+This setting is not stored. It always starts with 1 hour after the player started.  
+
+#### Screen rotation setup
+```
+ ----------------
+|                |
+|   -------->    |
+|  |    0    |   |
+|   <--------    |
+ ----------------
+```
+This allows rotating the screen by 180°. 0 stands for default and 180 for 180° rotated setting.  
+This setting is stored and reloaded on each player start.  
+  
+#### Rotary encoder direction setup
+```
+ ----------------
+|                |
+| o o            |
+|o   o    -->+   |
+| o o            |
+ ----------------
+```
+This allows switching the turn direction of the rotary knob. Left turns are getting right turns and vice versa.  
+This setting is stored and reloaded on each player start.  
+  
+#### Rotary encoder speed setup
+```
+ ----------------
+|                |
+| o o            |
+|o   o     x1    |
+| o o            |
+ ----------------
+```
+This allows changing the speed of the rotary knob. One can choose that every dent of the rotary encoder is used (x1) or only every 2nd dent (x0.5).  
+This setting is stored and reloaded on each player start.  
   
 # Uploading initial binary release
 For a brand new main controller board an initial upload is needed. This initial upload will setup the correct
@@ -803,8 +886,7 @@ much more complicated as well as a method of jumping to different bookmarks insi
 Only fully supported are CBR encoded files. The player also plays VBR files but the displayed timestamps might be wrong.
 Without scanning the full file or implementing code for the various VBR indexes there is no way to determine a correlation
 of file position and time.  
-The format handler functions take a look at the first frame of a file to determine the bitrate and therefore the frame length
-of a file.  
+The format handler functions takes a look at the first frame of a file to determine the bitrate and therefore the frame length of a file.  
   
 ## Metadata
 No metadata of files is used. This includes chapter indexes, subtitles or cover pictures.  

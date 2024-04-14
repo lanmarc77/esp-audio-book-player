@@ -46,6 +46,9 @@ typedef struct{
     int64_t volume;
     char lastFolderName[FF_FILE_PATH_MAX];
     uint32_t sleepTimeSetupS;
+    uint8_t screenRotation;
+    uint8_t rotaryEncoderSpeed;
+    uint8_t rotaryEncoderDirection;
 }SAVES_settings_t;
 
 

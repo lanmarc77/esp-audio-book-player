@@ -26,6 +26,7 @@
 
 void UI_MAIN_init();
 void UI_MAIN_run(uint8_t startUpFlags);
+uint8_t UI_MAIN_setupMenu();
 void UI_MAIN_deInit();
 
 uint8_t UI_MAIN_isImagePersisted();

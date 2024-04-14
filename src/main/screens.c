@@ -310,13 +310,88 @@ void SCREENS_sleepTimer(uint32_t secondsLeft){
   * @brief shows the setup screen for setting the wake up timer
   *
   * @param secondsLeft currently selected wake up time in s
+  * @param blinkMode 1=numbers blink, 0=no blinking
   * 
   */
-void SCREENS_wakeupTimer(uint64_t secondsTime){
+void SCREENS_wakeupTimer(uint64_t secondsTime,uint8_t blinkMode){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(16);
-    UI_ELEMENTS_timeSelect(6,3,secondsTime,1);
-    UI_ELEMENTS_update();
+    if(blinkMode==0){
+      UI_ELEMENTS_timeSelect(6,3,secondsTime,0);
+    }else{
+      UI_ELEMENTS_timeSelect(6,3,secondsTime,1);
+      UI_ELEMENTS_update();
+    }
+}
+
+/**
+  * @brief shows the setup screen for setting the wake up timer
+  *
+  * @param rotation 0=normal, 1=rotated
+  * @param blinkMode 1=numbers blink, 0=no blinking
+  * 
+  */
+void SCREENS_screenSetup(uint8_t rotation,uint8_t blinkMode){
+    uint64_t now=esp_timer_get_time();
+    char b[10];
+    UI_ELEMENTS_cls();
+    UI_ELEMENTS_mainSymbol(17);
+    if(rotation){
+      sprintf(&b[0],"180");
+    }else{
+      sprintf(&b[0]," 0 ");
+    }
+    if(blinkMode==0){
+        UI_ELEMENTS_textScrolly(6,2,4,&b[0]);
+    }else{
+      if(((now/1000)%1000)<100){
+          sprintf(&b[0],"   ");
+      }
+      UI_ELEMENTS_textScrolly(6,2,4,&b[0]);
+      UI_ELEMENTS_update();
+    }
+}
+
+void SCREENS_rotDirSetup(uint8_t dir,uint8_t blinkMode){
+    uint64_t now=esp_timer_get_time();
+    char b[10];
+    UI_ELEMENTS_cls();
+    UI_ELEMENTS_mainSymbol(18);
+    if(dir){
+      sprintf(&b[0],"+ <--");
+    }else{
+      sprintf(&b[0],"--> +");
+    }
+    if(blinkMode==0){
+        UI_ELEMENTS_textScrolly(8,2,5,&b[0]);
+    }else{
+      if(((now/1000)%1000)<100){
+          sprintf(&b[0],"     ");
+      }
+      UI_ELEMENTS_textScrolly(8,2,5,&b[0]);
+      UI_ELEMENTS_update();
+    }
+}
+
+void SCREENS_rotSpeedSetup(uint8_t speed,uint8_t blinkMode){
+    uint64_t now=esp_timer_get_time();
+    char b[10];
+    UI_ELEMENTS_cls();
+    UI_ELEMENTS_mainSymbol(19);
+    if(speed){
+      sprintf(&b[0],"x0.5");
+    }else{
+      sprintf(&b[0],"  x1");
+    }
+    if(blinkMode==0){
+      UI_ELEMENTS_textScrolly(8,2,5,&b[0]);
+    }else{
+      if(((now/1000)%1000)<100){
+          sprintf(&b[0],"     ");
+      }
+      UI_ELEMENTS_textScrolly(8,2,5,&b[0]);
+      UI_ELEMENTS_update();
+    }
 }
 
 #endif
