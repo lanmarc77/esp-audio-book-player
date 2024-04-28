@@ -156,19 +156,26 @@ void SCREENS_lowBattery(uint32_t batt){
   * @param repeatMode currently selected repeatMode
   * 
   */
-void SCREENS_playOverlay(uint8_t mode, int64_t volume,uint16_t playSpeed,uint8_t equalizer,uint8_t repeatMode){
+void SCREENS_playOverlay(uint8_t mode, int64_t volume,uint16_t playSpeed,uint8_t equalizer,uint8_t repeatMode,uint32_t sleepTimeSetupS,uint32_t sleepTimeOffTime){
   UI_ELEMENTS_cls();
   switch(mode){
     case 0: //volume
           UI_ELEMENTS_volume(volume);
           break;
-    case 1: //play speed
+    case 1: //sleep timer
+          if(sleepTimeOffTime==0){//sleep timer is currently not running
+            SCREENS_sleepTimer(sleepTimeOffTime);
+          }else{
+            SCREENS_sleepTimer(sleepTimeSetupS);
+          }
+          break;
+    case 2: //play speed
           UI_ELEMENTS_playSpeed(playSpeed);
           break;
-    case 2: //equalizer
+    case 3: //equalizer
           UI_ELEMENTS_equalizer(equalizer);
           break;
-    case 3: //repeat mode
+    case 4: //repeat mode
           UI_ELEMENTS_repeatMode(repeatMode);
           break;
   }
@@ -189,10 +196,12 @@ void SCREENS_playOverlay(uint8_t mode, int64_t volume,uint16_t playSpeed,uint8_t
   * @param allPlaySecond seconds length of the current track
   * @param batt current battery level in mV
   * @param sleepTimeSecondsLeft if >0 the seconds left of the sleep timer is displayed
+  * @param playOverlaySecondsLeft if >0 the seconds left of the sub menu state within the play overlay screen
   * 
   */
-void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint8_t repeatMode,uint16_t allPlayMinute,uint8_t allPlaySecond,uint32_t batt,uint32_t sleepTimeSecondsLeft){
+void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint8_t repeatMode,uint16_t allPlayMinute,uint8_t allPlaySecond,uint32_t batt,uint32_t sleepTimeSecondsLeft,uint32_t playOverlaySecondsLeft){
     uint64_t now=esp_timer_get_time();
+    char b[3]={0};
     UI_ELEMENTS_cls();
     UI_ELEMENTS_progressBar(percent);
     if((allPlayMinute+allPlaySecond>0)&&(((now/1000)%8000)<2000)){
@@ -207,6 +216,11 @@ void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,
     }else{
         UI_ELEMENTS_mainSymbol(2);
     }
+    playOverlaySecondsLeft/=1000;
+    if((playOverlaySecondsLeft)>0){
+      b[0]=10-(playOverlaySecondsLeft%10)+48;
+      UI_ELEMENTS_textScrolly(8,3,1,&b[0]);
+    }
     UI_ELEMENTS_batteryIndicator(batt);
     UI_ELEMENTS_sleepTimeLeft(sleepTimeSecondsLeft);
     UI_ELEMENTS_update();
@@ -217,14 +231,14 @@ void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,
   * @param sdSizeMB raw size of the SD card in MB
   * @param SPIFFSUsagePercent SPIFSS fill level in % 0..100
   */
-void SCREENS_switchingOff(uint64_t sdSizeMB,uint8_t SPIFFSUsagePercent){
+void SCREENS_switchingOff(uint64_t sdSizeMB,uint8_t SPIFFSUsagePercent,int32_t numberOfBookmarks){
     char s[20];
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(8);
     sprintf(&s[0],"%7lluMB",sdSizeMB);
     UI_ELEMENTS_textScrolly(3,2,12,&s[0]);
-    sprintf(&s[0],"%3d%%",SPIFFSUsagePercent);
-    UI_ELEMENTS_textScrolly(5,3,5,&s[0]);
+    sprintf(&s[0],"%6li/%d%%",numberOfBookmarks,SPIFFSUsagePercent);
+    UI_ELEMENTS_textScrolly(2,3,16,&s[0]);
     UI_ELEMENTS_update();
 }
 
@@ -300,9 +314,17 @@ void SCREENS_fwUpgradeRunning(int8_t percent){
   * 
   */
 void SCREENS_sleepTimer(uint32_t secondsLeft){
+    char b[10];
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(8);
-    UI_ELEMENTS_numberSelect(0,2,secondsLeft/60,99,1);
+    if(secondsLeft==0){
+        sprintf(&b[0],"-");
+        UI_ELEMENTS_textScrolly(7,2,1,&b[0]);
+    }else{
+      sprintf(&b[0],"m");
+      UI_ELEMENTS_numberSelect(0,2,secondsLeft/60,99,1);
+      UI_ELEMENTS_textScrolly(10,2,1,&b[0]);
+    }
     UI_ELEMENTS_update();
 }
 
@@ -390,6 +412,24 @@ void SCREENS_rotSpeedSetup(uint8_t speed,uint8_t blinkMode){
           sprintf(&b[0],"     ");
       }
       UI_ELEMENTS_textScrolly(8,2,5,&b[0]);
+      UI_ELEMENTS_update();
+    }
+}
+
+void SCREENS_bookmarkDeletionSetup(int32_t numberOfFiles,uint8_t blinkMode){
+    uint64_t now=esp_timer_get_time();
+    char b[10];
+    UI_ELEMENTS_cls();
+    UI_ELEMENTS_mainSymbol(20);
+    sprintf(&b[0],"%6li",numberOfFiles);
+    if(blinkMode==0){
+      UI_ELEMENTS_textScrolly(0,2,6,&b[0]);
+    }else{
+      UI_ELEMENTS_textScrolly(0,2,6,&b[0]);
+      if(((now/1000)%1000)<100){
+          sprintf(&b[0],"   ");
+          UI_ELEMENTS_textScrolly(7,3,3,&b[0]);
+      }
       UI_ELEMENTS_update();
     }
 }

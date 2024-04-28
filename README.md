@@ -19,6 +19,8 @@ This is a device that is meant to play non-DRM audio books from an SD card and h
 - firmware upgrades from SD card
 - based on pure esp-idf + esp-adf
 - plays 50hrs+ with 2500mAh 18650 battery
+- does not need nor use any wireless connection
+- does not track the user in any way
 - charging via USB-C
 - endless options of integrations with speakers/cases
   
@@ -42,11 +44,8 @@ Currently (2023) one really needs to search hard to find an offline only non tra
 able to play files from huge SD cards and at the same time sorts the files based on their name and remembers and
 resumes the last listening position.  
 Many people nowadays will use subscription services with corresponding apps on their smartphone. These services
-and the apps usually track the users. They can also be canceled at any time. May it be for politics or economic
-reasons. They usually do not allow you to own the audio book but only sell a license to listen at it for as long
-as the company exists or is allowed to do business with you.  
-I have an audio book collection that I created by only buying if I can download the files or
-copy them e.g. from a CD to keep them. Without DRM.  
+and the apps usually track the users build profiles suggest new audio books sell ads and more. Services like these can be canceled at any time. May it be for politics or economic reasons. They usually do not allow you to own the audio book but only sell a license to listen at it for as long as the company exists or is allowed to do business with you.  
+I have an audio book collection that I created by only buying if I can download the files or copy them e.g. from a CD to keep them. Without any DRM.  
 All my audio books are converted to and then stored in AMR-WB as for me the quality with 24kBit/s mono is good enough.
 This shrinks an MP3 file to approx. 1/10ths when using AMR-WB and also makes the backup cheap. One CD with AMR-WB
 can hold 60hrs, a DVD 350hrs, a 25GB BD-R 2000hrs+.  
@@ -54,8 +53,7 @@ Using existing electronics hardware modules and the software of this repository 
 just plays my audio books. Not more, not less. And it most likely will do so in 30years assuming nothing breaks.
 There are still 30yrs+ old Nintendo Gameboys that work like a charm and are being refurbished.  
 Additionally I can change the behavior of the software as I like. The whole development environment works offline
-and can also be installed in an offline virtual machine and will still be able to compile even if the
-hardware manufacturer of the main controller board does not exist anymore.  
+and can also be installed in an offline virtual machine and will still be able to compile even if the hardware manufacturer of the main controller board does not exist anymore.  
   
 # Videos
 Download and watch:  
@@ -174,25 +172,24 @@ setting x1.0.
 | 24kbit/s amr 16000 khz               | 75%  | 52ma   |
 | any file from before                 | 100% | ~105mA |
   
-At high volumes the energy needed by the speaker dominates the current consumption. Also the current is
-not very stable and highly depends on the content that is actually played.  
+At high volumes the energy needed by the speaker dominates the current consumption. Also the current is not very stable and highly depends on the content that is actually played.  
 The volume setting actually follows an x⁴ curve for translating % into power to fit our hearing.  
-Depending on play speed settings the current consumption rises. This is due to the fact that more data
-needs to be handled and the CPU frequency is stepped up. Approximately 2mA per 0.1 step speed up.  
+Depending on play speed settings the current consumption rises. This is due to the fact that more data needs to be handled and the CPU frequency is stepped up. Approximately 2mA per 0.1 step speed up.  
   
-An 18650 battery with 2500mAh will most certainly hold 50hrs assuming average volume levels between 50%...75%.  
+Real life tests resulted in a runtime of 54hrs:05mins playing 24kbit/s amr audio on QKZ AK6 earphones at 50% volume with a Murata / Sony Konion US18650VTC5D 2800mAh battery on firmware v00.00.08 (normal speed, no equalizer). A full charge after this test took 5hrs:15mins.  
   
 # UI and player navigation
 The following sub chapters explain the states of the player and the different menus or screens the player shows.  
 You might want to watch the videos above for a shorter introduction.  
   
 ## The rotary encoder
-The only input device is a rotary encoder with a button. It currently supports the following actions:  
-
+The only input device is a rotary encoder with a button. They are usually used as:  
+  
 - rotation for number, time and volume selections, speed of rotation in most menus increases the step size of the setup unit
 - short click usually used for ok
-- long click usually used as cancel or back
+- long click usually used as back, stop or cancel
 - double click activates sub or special functions
+  
 
 ## The players state machine
 Legend:  
@@ -258,32 +255,20 @@ AC=any type of click
   |     |    |    |             |   |      v            SC |   |
   |     |    |     -------------    |    play overlay ----     |
   |     |    |                      |    screen                |
-  |     |    | scan      -----------     |2s  ^                |
-  |     |    | finished |                |    |                |
-  |     |    |          | LC             |    |rotate          | LC
-  |     |    v          |    SC          v    |   SC           |
-  |     |    pause screen  -----------> playing ------------> pause screen
+  |     |    | scan      -----------     |3s  ^                |
+  |     |    | finished |                |    | rotate         |
+  |     |    |          | LC             |    |                | LC
+  |     |    v          |       SC       v    |       SC       |
+  |     |    pause screen  <----------> playing <-----------> pause screen
   |     |    with chapter  <----------  screen <------         with time
   |     |     selection            LC     |           |        selection
-  |     |        |                        | DC        |            |
-  |     |        | DC                     |        play next       | DC
-  |     |        |                         -------> chapter        |
-  |     |        |                                                 |
-  |     |         ------------------------------------------------>|
-  |     |                                                          |
-  |     |                                                          v
-  |     |                                                      sleep timer
-  |     |                                                     setup screen
-  |     |                                                     |           |
-  |     |                                                     | SC        | any other click
-  |     |                                                     | activate  | timer not
-  |     |                                                     | timer     | activated
-  |     |                                                     |           |
-  |     |                                                      ----- -----
-  |     |                                                           |
-  |     |                                                           v
-  |     |                                                    back to originating
-  |     |                                                      pause screen
+  |     |                                 | DC        |
+  |     |                                 |        play next
+  |     |                                  -------> chapter
+  |     |
+  |     |
+  |     |
+  |     |
   |      -----------------
   |                       |          next settings
   |      LC               v             screen
@@ -296,9 +281,9 @@ AC=any type of click
      |           any chosen setup screen <--------------
      |           |              |  |            rotate  |
      |           | SC           |   --------------------
-     |           |              |
+     |           | means ok     |
      |           |              | any other
-     |           | for wakeup   | click
+     |           | for wakeup   | click cancels
      |           | timer:       | for wakeup timer:
      |           | activated    | deactivated
      |           v              |
@@ -308,9 +293,7 @@ AC=any type of click
 
 After 30s of no click the screen turns off. If the player is not playing and the screen was off for an additional
 30s then the player powers off.  
-If the screen is off any click will first turn the screen on. An additional click is needed for the
-desired action. There is one exception: the double click in the play screen to skip to the next
-chapter works right away even if the screen is off.  
+If the screen is off any click will first turn the screen on. An additional click is needed for the desired action. There is one exception: the double click in the play screen to skip to the next chapter works right away even if the screen is off.  
 If the battery level drops below 3.35V the low battery screen is shown and the player powers off.  
   
 ## The menus
@@ -323,7 +306,7 @@ If something can be setup using rotation usually that element flashes.
 |                |
 |     (o_o)      |
 |       ok       |
-|   v00.00.06    |
+|   v00.00.08    |
  ----------------
 ```
 Shows the firmware version number. If ok is displayed the firmware is persisted. If TEST is displayed
@@ -355,10 +338,10 @@ Shown until the reset procedure is finished.
 ### Upgrade init screen
 ```
  ----------------
-| ||    00.00.04 |
+| ||    00.00.07 |
 |-  -     vvv    |
 |-  -      ?     |
-| ||    00.00.05 |
+| ||    00.00.08 |
  ----------------
 ```
 Shows the currently installed firmware and the new version that can be installed.  
@@ -366,10 +349,10 @@ Shows the currently installed firmware and the new version that can be installed
 ### Upgrade countdown screen
 ```
  ----------------
-| ||    00.00.04 |
+| ||    00.00.07 |
 |-  -     vvv    |
 |-  -     5s     |
-| ||    00.00.05 |
+| ||    00.00.08 |
  ----------------
 ```
 A countdown counts down to signal the upgrade will be started.  
@@ -426,7 +409,7 @@ The progress bar at the bottom shows the progress of the scan an sorting process
  ----------------
 ```
 Using rotation the different audio books can be selected. The screen shows selected 12 of 121 audio books.
-The audio book name at the top is essentially the name of the folder and scrolls through the screen if it is long.  
+The audio book name at the top is the name of the folder and scrolls through the screen if it is long.  
 The value 00:01 is only shown if the wake up timer has been setup and activated and shows the setup value.  
   
 ### Audio book content scan screen
@@ -439,6 +422,7 @@ The value 00:01 is only shown if the wake up timer has been setup and activated 
  ----------------
 ```
 The progress bar at the bottom shows the progress of the scan and sorting process and A and B are animated.  
+The sorting can be canceled if it takes too long by using any click.  
   
 ### Pause screen
 ```
@@ -473,17 +457,28 @@ The time is switching repeatedly between current time position and time left.
 The value 3m is only displayed if a sleep timer was setup and activated and shows the time left until the player will power off.  
 The progress bar at the bottom shows the progress within the current chapter.  
 On right side the battery level in percent is shown.  
+If an asterisk ```*```  is shown beside the pause symbol ```||``` then repeat mode for this audio book is active.  
+Sometimes a countdown is shown in the middle of the progress bar. It counts the amount of seconds left until the play overlay screen sub menu position is switching back to volume.  
   
 #### Play overlay screen
 ```
-     volume               play speed
+     volume               sleep timer
  ----------------      ----------------  
 |################|    |                |
-|################| -> |     >>>>>>>>   |
-|##              |    |      x1.20     |
+|################| -> |    (-_-)Zzz    |
+|##              |    |      1/99m     |
 |      5100      |    |                |
  ----------------      ----------------
         ^                     |
+        |                     v
+        |                 play speed
+        |              ----------------  
+        |             |                |
+        |             |     >>>>>>>>   |
+        |             |      x1.20     |
+        |             |                |
+        |              ----------------
+        |                     |
         |                     v
   repeat mode              equalizer
  ----------------      ----------------  
@@ -493,32 +488,17 @@ On right side the battery level in percent is shown.
 |                |    |                |
  ----------------      ----------------
 ```
-The play overlay screen is activated when a file is played and the rotary encoder is turned. If it is active a short click
-is going through the different settings. This screen will automatically switch back to the play screen after 2s of
-no user input but will remember for 8 more seconds at which sub menu it was left.  
+The play overlay screen is activated when a file is played and the rotary encoder is turned. If it is active a short click is going through the different settings. This screen will automatically switch back to the play screen after 3s of no user input but will remember for 8 more seconds at which sub menu it was left.  
   
-Volume: The # characters are a visual representation of the setup volume. Volume level ranges from 0...10000. 7500 actually
-marks 100% audio volume of the source everything above this will add a gain of up to 25% to the source volume level.  
+Volume: The # characters are a visual representation of the setup volume. Volume level ranges from 0...10000. 7500 actually marks 100% audio volume of the source everything above this will add a gain of up to 25% to the source volume level.  
+  
+Sleep timer: Using rotation the sleep timer can be setup from 1 minute to 99 minutes in minute precision. Time automatically starts if a value is setup and is canceled if - is displayed.  
   
 Play speed: Using rotation the speed can be setup. Play speed is changed instantly and stored individually for each audio book.  
   
-Equalizer:  Using rotate you can choose between the different equalizer presets. The setting is stored individually
-for each audio book.  
+Equalizer:  Using rotate you can choose between the different equalizer presets. The setting is stored individually for each audio book.  
   
-Repeat mode:  Using rotate one can choose to enable folder repeat (<-->) or not (-->). The setting is stored individually
-for each audio book.  
-  
-
-### Sleep timer setup screen
-```
- ----------------
-|                |
-|    (-_-)Zzz    |
-|      1/99      |
-|                |
- ----------------
-```
-Using rotation the sleep timer can be setup from 1 minute to 99 minutes in minute precision.  
+Repeat mode:  Using rotate one can choose to enable folder repeat (<-->) or not (-->). The setting is stored individually for each audio book.  
   
 ### Low battery screen
 ```
@@ -537,30 +517,39 @@ On the right side the battery level in percent is shown.
 |                |
 |    (-_-)Zzz    |
 |    241160MB    |
-|       2%       |
+|     15/2%      |
  ----------------
 ```
-Also shows the size of the detected SD card and the used space of the bookmark storage in the SPIFFS
-of the ESP32.  
+Also shows the size of the detected SD card, the number of stored bookmarks and the used space of the bookmark storage in the SPIFFS of the ESP32.  
   
 ### Global settings/functionality
 ```
    wakeup timer         screen rotation
  ----------------      ----------------  
-|       1/4      |    |       2/4      |
+|       1/5      |    |       2/5      |
 |(-_-)  ->  (o_o)| -> |   -------->    |
 |                |    |  |    0    |   |
 |      01:00     |    |   <--------    |
  ----------------      ----------------
         ^                     |
         |                     v
-  rotary encoder        rotary encoder
-      speed                direction
+        |               rotary encoder
+        |                 direction
+        |              ----------------  
+        |             |       3/5      |
+        |             | o o            |
+        |             |o   o    -->+   |
+        |             | o o            |
+        |              ----------------
+        |                     |
+        |                     v
+     bookmark           rotary encoder
+     deletion               speed
  ----------------      ----------------  
-|       4/4      |    |       3/4      |
-| o o            | <- | o o            |
-|o   o     x1    |    |o   o    -->+   |
-| o o            |    | o o            |
+|       5/5      |    |       4/5      |
+|   Bookmarks    | <- | o o            |
+|    10 -> 0     |    |o   o     x1    |
+|       ?        |    | o o            |
  ----------------      ----------------
 ```
 After entering the global settings the rotary knob can be used to select the setting to change.  
@@ -577,9 +566,10 @@ If this menu is left with a long click all settings that are saveable are saved.
 |      01:00     |
  ----------------
 ```
-Using rotation the sleep timer can be setup from 1 minute to to 24 hours in minute precision.  
+Using rotation the wakeup timer can be setup from 1 minute to to 24 hours in minute precision.  
 This setting is not stored. It always starts with 1 hour after the player started.  
-
+Once the timer was activated its setup time starts counting **after** the player was shutdown independent if the shutdown was initiated manually or by a sleep timer.  
+  
 #### Screen rotation setup
 ```
  ----------------
@@ -616,10 +606,19 @@ This setting is stored and reloaded on each player start.
 This allows changing the speed of the rotary knob. One can choose that every dent of the rotary encoder is used (x1) or only every 2nd dent (x0.5).  
 This setting is stored and reloaded on each player start.  
   
+#### Bookmark deletion
+```
+ ----------------
+|                |
+|   Bookmarks    |
+|    10 -> 0     |
+|       ?        |
+ ----------------
+```
+Shows the number of bookmarks that can be deleted using a short click without deleting other settings.  
+  
 # Uploading initial binary release
-For a brand new main controller board an initial upload is needed. This initial upload will setup the correct
-partition details and installs the firmware for the first time. After this initial upload firmware upgrades
-via the SD card are possible.  
+For a brand new main controller board an initial upload is needed. This initial upload will setup the correct partition details and installs the firmware for the first time. After this initial upload firmware upgrades via the SD card are possible.  
 The binary release files in the [release](https://github.com/lanmarc77/esp-audio-book-player/releases) section:  
   
 - bootloader.bin
@@ -655,11 +654,8 @@ Ideally no errors are shown and the initial upload is finished.
 For upgrading firmware once the initial upload was done only one specific file from the
 [release section](https://github.com/lanmarc77/esp-audio-book-player/releases) is needed: XX.XX.XX_ota.fw  
 XX are letters from A-F or/and numbers from 0-9 specifying the firmware version of this release.  
-Place the file on the SD card in a folder called `fwupgrade`. Once you start the device it should
-present you with the upgrade screen. The upgrade screen is left without upgrading if no user interaction is
-happening for 10s.  
-If you wish to upgrade shortly press the encoder button. A countdown of 10s gives you the possibility
-to stop the upgrade if you press the encoder button. Once the upgrade started you can not interrupt it.
+Place the file on the SD card in a folder called `fwupgrade`. Once you start the device it should present you with the upgrade screen. The upgrade screen is left without upgrading if no user interaction is happening for 10s.  
+If you wish to upgrade shortly press the encoder button. A countdown of 10s gives you the possibility to stop the upgrade if you press the encoder button. Once the upgrade started you can not interrupt it.
 The actual writing process for the upgrade takes around 10s and the progress is shown.  
   
 If everything worked you should now see the device restart with the new firmware version but it displays
@@ -829,35 +825,28 @@ This projects implementation has two options of displaying and playing sorted en
   
 ### Sorting each time
 This is the default implementation. After startup when the list of all available audio books is read this list is sorted.
-Instead of keeping the strings/names of all entries in memory only their file allocation table position is used. This position
-acts as kind of ID of the entry. This ID is then sorted inside an array but not by its value but by its corresponding name.
+Instead of keeping the strings/names of all entries in memory only their file allocation table position is used. This position acts as kind of ID of the entry. This ID is then sorted inside an array but not by its value but by its corresponding name.
 But this also means that the algorithm always has to translate between ID and name of the file resulting in an increased
 time of sorting. The algorithm used is a selection sort with a complexity of O(n²). But it is memory deterministic.  
-This allows keeping 1000 entries with only 2kB of memory usage. To wait for 1000 entries to be sorted is also
-still acceptable. Sorting speed is also determined by the way entries are named. As the C function strcmp is starting to compare
-at the beginning of a string the earlier a mismatch happens the earlier it can stop. It is beneficial to name files e.g.
-01... , 02... instead of ...01, ...02.  
+This allows keeping 1000 entries with only 2kB of memory usage. To always wait for 1000 entries to be sorted is also still acceptable.  
+Sorting speed is also determined by the way entries are named. As the C function strcmp is starting to compare at the beginning of a string the earlier a mismatch happens the earlier it can stop. It is beneficial to name files e.g. 01... , 02... instead of ...01, ...02.  
 If a directory contains more than 1000 entries they are not taken into account.  
 This described sorting applies for audio books (directories) and their content (files).  
   
 ### Presorted list of root directory
-As I wanted the player to be able to also hold large collections of audio books 1000 entries in the root directory
-did not seem enough.  
+As I wanted the player to be able to also hold large collections of audio books 1000 entries in the root directory did not seem enough.  
 But sorting would take too long to be acceptable. Instead a presorted entry list can be created. Much like an .m3u file.  
-The file needs be called `presorted.txt` and must reside in the root directory of the SD card. It can contain 9999 lines
-where each line contains the directory name. The order in the file is the order in which they are displayed in
-the player.  
+The file needs be called `presorted.txt` and must reside in the root directory of the SD card. It can contain 9999 lines where each line contains the directory name. The order in the file is the order in which they are displayed in the player.  
 The following command chain can be used in the root directory of the SD card to create such a sorted file:  
   
 `find * -type d -print | sort | iconv -t 437 > presorted.txt`  
   
-Names of entries must be in code page 437 format as this is the only one that is enabled in the ESP32. I did not wanted
-to make things more complicated by supporting all kinds of character encodings.  
-9999 entries=audio books with an average length of an audio book of 6hrs would take almost 55 years of listening if
-you listen every single day for 3hrs.  
+Names of entries are expected to be in code page 437 format as this is the only one that is enabled in the ESP32. I did not wanted to make things more complicated by supporting all kinds of character encodings.  
+9999 entries=audio books with an average length of an audio book of 6hrs would take almost 55 years of listening if you listen every single day for 3hrs.  
   
 Assuming AMR-WB file format with 24kbit/s the SD card would need to have ~618GB.  
 Assuming MP3 file format with 128kbit/s the SD card would need to have ~3.3TB.  
+These are the implementation limits which should not be relevant much while using the player.  
   
 As the files within a directory/audio book are usually below 1000 the presorted.txt is not implemented for these.
   
@@ -871,21 +860,15 @@ Each bookmark is written when the player is paused or is powered off by one of t
 or sleep timer. A bookmark is a file in the SPIFFS. The name of the file is an MD5 hash constructed from the directory
 name of the audio book. Inside the bookmark the listening position is stored and the file name that was currently played.  
   
-Depending on the length of the file name bookmarks take more or less space in SPIFFS. On average 1kb can be assumed. This
-means around 500 bookmarks can be stored. Deleting individual bookmarks is not possible. But by using the reset procedure
-all bookmarks can be deleted. The off screen displays the usage of the SPIFFS in percent.  
-There is an automatic house keeping implemented. If the SPIFFS usage level is above 75% the SD card and the bookmarks are
-scanned. If there are bookmarks for which no fitting directory on the SD card exists this bookmark is deleted. This house
-keeping is based on the use case that SD cards are being swapped and around 500 audio books is the average on one of the
-SD cards.  
+Depending on the length of the file name bookmarks take more or less space in SPIFFS. On average 1kb can be assumed. This means around 500 bookmarks can be stored. Deleting individual bookmarks is not possible. But by using the reset procedure all bookmarks can be deleted. The off screen displays the usage of the SPIFFS in percent.  
+There is an automatic house keeping implemented. If the SPIFFS usage level is above 75% the SD card and the bookmarks are scanned. If there are bookmarks for which no fitting directory on the SD card exists this bookmark is deleted. This house keeping is based on the use case that SD cards are being swapped and around 500 audio books is the average on one of the SD cards.  
   
 Manual bookmarks are not supported. Mainly because I personally never needed them but also because house keeping gets
 much more complicated as well as a method of jumping to different bookmarks inside the same audio book must be implemented.  
   
 ## CBR/VBR
 Only fully supported are CBR encoded files. The player also plays VBR files but the displayed timestamps might be wrong.
-Without scanning the full file or implementing code for the various VBR indexes there is no way to determine a correlation
-of file position and time.  
+Without scanning the full file or implementing code for the various VBR indexes there is no way to determine a correlation of file position and time.  
 The format handler functions takes a look at the first frame of a file to determine the bitrate and therefore the frame length of a file.  
   
 ## Metadata
@@ -894,8 +877,7 @@ No metadata of files is used. This includes chapter indexes, subtitles or cover 
 ## Bluetooth audio
 The used µC board uses the ESP32-S3. This newer model of the ESP32 does not support the so called classic Bluetooth
 audio stack which uses SBC as codec. It only supports the not yet widely used Bluetooth Audio LE. The esp-adf does
-not yet support a pipeline element that uses Bluetooth Audio LE. Once support is added and devices are getting more common
-I might implement support for it.  
+not yet support a pipeline element that uses Bluetooth Audio LE. Once support is added and devices are getting more common. I might implement support for it.  
 It might also be possible to make this project compile with the classic ESP32 that does support classic Bluetooth using SBC.
 But I do not plan for this as I use headphones with a jack and no extra battery I need to take care of.  
   
@@ -908,5 +890,6 @@ This will increase power consumption and reduce system runtime.
 # Ideas/future
 - multi user support with individual bookmarks
 - audio navigation for handicapped people
+- refactoring of code especially the huge ui_main.c
 
 
