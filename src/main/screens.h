@@ -28,15 +28,16 @@ void SCREENS_pause0(uint16_t selectedFile,uint16_t amountOfFiles,char* folderNam
 void SCREENS_pause1(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint32_t batt,uint32_t sleepTimeSecondsLeft);
 void SCREENS_lowBattery(uint32_t batt);
 void SCREENS_startUp(uint8_t imageFlags);
-void SCREENS_playOverlay(uint8_t mode, int64_t volume,uint16_t playSpeed,uint8_t equalizer,uint8_t repeatMode);
-void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint8_t repeatMode,uint16_t allPlayMinute,uint8_t allPlaySecond,uint32_t batt,uint32_t sleepTimeSecondsLeft);
+void SCREENS_playOverlay(uint8_t mode, int64_t volume,uint16_t playSpeed,uint8_t equalizer,uint8_t repeatMode,uint32_t sleepTimeSetupS,uint32_t sleepTimeOffTime);
+void SCREENS_play(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint8_t repeatMode,uint16_t allPlayMinute,uint8_t allPlaySecond,uint32_t batt,uint32_t sleepTimeSecondsLeft,uint32_t playOverlaySecondsLeft);
 void SCREENS_fwUpgradeInit(uint8_t major,uint8_t minor,uint8_t patch,int8_t timeout);
 void SCREENS_fwUpgradeRunning(int8_t percent);
-void SCREENS_switchingOff(uint64_t sdSizeMB,uint8_t SPIFFSUsagePercent);
+void SCREENS_switchingOff(uint64_t sdSizeMB,uint8_t SPIFFSUsagePercent,int32_t numberOfBookmarks);
 void SCREENS_sleepTimer(uint32_t secondsLeft);
 void SCREENS_wakeupTimer(uint64_t secondsTime,uint8_t blinkMode);
 void SCREENS_screenSetup(uint8_t rotation,uint8_t blinkMode);
 void SCREENS_rotDirSetup(uint8_t dir,uint8_t blinkMode);
 void SCREENS_rotSpeedSetup(uint8_t speed,uint8_t blinkMode);
+void SCREENS_bookmarkDeletionSetup(int32_t numberOfFiles,uint8_t blinkMode);
 
 #endif

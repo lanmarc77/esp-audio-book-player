@@ -61,7 +61,7 @@ uint8_t SAVES_saveSettings(SAVES_settings_t *settings);
 void SAVES_getBookmarkFileFromFolderName(char* folderName,char* saveFileName);
 uint8_t SAVES_existsBookmark(char* folderName,SAVES_saveState_t* save);
 uint8_t SAVES_saveBookmark(char* folderName,SAVES_saveState_t* save);
-void SAVES_cleanOldBookmarks();
+int32_t SAVES_cleanOldBookmarks(uint8_t flags);
 int32_t SAVES_getUsedSpaceLevel();
 
 #endif

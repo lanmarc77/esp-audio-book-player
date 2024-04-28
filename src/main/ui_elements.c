@@ -294,6 +294,11 @@ void UI_ELEMENTS_mainSymbol(uint8_t symbol){
         SSD1306_printStr(0,1," o o            ");
         SSD1306_printStr(0,2,"o   o           ");
         SSD1306_printStr(0,3," o o            ");
+    }else if(symbol==20){//bookmark deletion
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1,"   Bookmarks    ");
+        SSD1306_printStr(0,2,"?????? -> 0     ");
+        SSD1306_printStr(0,3,"       ?        ");
     }
 }
 

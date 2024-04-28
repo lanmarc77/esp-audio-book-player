@@ -25,7 +25,7 @@
 */
 #define FW_MAJOR 00
 #define FW_MINOR 00
-#define FW_PATCH 07
+#define FW_PATCH 8
 
 void UI_ELEMENTS_init();
 void UI_ELEMENTS_textScrolly(uint8_t x,uint8_t y, uint8_t length, char *string);

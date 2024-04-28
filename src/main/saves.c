@@ -221,10 +221,14 @@ uint8_t SAVES_saveBookmark(char* folderName,SAVES_saveState_t* save){
 /**
   * @brief deletes bookmarks from the spiffs which folders+files do not exist on the sd card (anymore)
   *
+  * @param flags 0=delete unused bookmarks, 1=only count number of bookmarks but do not clean up, 15=force delete also used bookmarks
+  * 
+  * @return >=0 number of files deleted, <0 error occured
   */
-void SAVES_cleanOldBookmarks(){
+int32_t SAVES_cleanOldBookmarks(uint8_t flags){
     char fullfile[FF_FILE_PATH_MAX];
     char fullfile2[FF_FILE_PATH_MAX];
+    int32_t fileCounter=0;
     struct dirent *currentEntry;
     SAVES_saveState_t save;
     FILE* f;
@@ -234,30 +238,44 @@ void SAVES_cleanOldBookmarks(){
         while ((currentEntry = readdir(dir)) != NULL) {
             if(currentEntry->d_type!=DT_DIR){
                 if(currentEntry->d_name[strlen(currentEntry->d_name)-1]=='b'){//file extension .b?
-                    strcpy(&fullfile[0],"/s/");
-                    strcat(&fullfile[0],currentEntry->d_name);
-                    f = fopen(&fullfile[0], "rb");
-                    if (f == NULL) {
-                        ESP_LOGE(SAVES_LOG_TAG,"Could not open save file %s from SPIFFS.",&fullfile[0]);
-                        continue;//ignore files that cant be opened
-                    }
-                    int32_t result=fread(&save,1,sizeof(SAVES_saveState_t),f);
-                    if(result>=sizeof(SAVES_saveState_t)){
-                        strcpy(&fullfile2[0],SD_CARD_MOUNT_POINT"/");
-                        strcat(&fullfile2[0],&save.folderName[0]);
-                        strcat(&fullfile2[0],"/");
-                        strcat(&fullfile2[0],&save.fileName[0]);
-                        f2 = fopen(&fullfile2[0], "rb");
-                        if(f2==NULL){
+                    if(flags==1){
+                        fileCounter++;
+                    }else{
+                        strcpy(&fullfile[0],"/s/");
+                        strcat(&fullfile[0],currentEntry->d_name);
+                        if(flags==15){
                             if(remove(&fullfile[0])==0){
-                                ESP_LOGI(SAVES_LOG_TAG,"Deleted missing save: %s->%s",&fullfile[0],&fullfile2[0]);
+                                fileCounter++;
+                                ESP_LOGI(SAVES_LOG_TAG,"Force deleted save: %s",&fullfile[0]);
                             }else{
-                                ESP_LOGE(SAVES_LOG_TAG,"ERROR deleting missing save: %s->%s",&fullfile[0],&fullfile2[0]);
+                                ESP_LOGE(SAVES_LOG_TAG,"ERROR force deleting save: %s",&fullfile[0]);
                             }
+                        }else{
+                            f = fopen(&fullfile[0], "rb");
+                            if (f == NULL) {
+                                ESP_LOGE(SAVES_LOG_TAG,"Could not open save file %s from SPIFFS.",&fullfile[0]);
+                                continue;//ignore files that cant be opened
+                            }
+                            int32_t result=fread(&save,1,sizeof(SAVES_saveState_t),f);
+                            if(result>=sizeof(SAVES_saveState_t)){
+                                strcpy(&fullfile2[0],SD_CARD_MOUNT_POINT"/");
+                                strcat(&fullfile2[0],&save.folderName[0]);
+                                strcat(&fullfile2[0],"/");
+                                strcat(&fullfile2[0],&save.fileName[0]);
+                                f2 = fopen(&fullfile2[0], "rb");
+                                if(f2==NULL){
+                                    if(remove(&fullfile[0])==0){
+                                        fileCounter++;
+                                        ESP_LOGI(SAVES_LOG_TAG,"Deleted missing save: %s->%s",&fullfile[0],&fullfile2[0]);
+                                    }else{
+                                        ESP_LOGE(SAVES_LOG_TAG,"ERROR deleting missing save: %s->%s",&fullfile[0],&fullfile2[0]);
+                                    }
+                                }
+                                fclose(f2);
+                            }
+                            fclose(f);
                         }
-                        fclose(f2);
                     }
-                    fclose(f);
                 }
             }
         }
@@ -265,6 +283,7 @@ void SAVES_cleanOldBookmarks(){
     }else{
         closedir(dir);
     }
+    return fileCounter;
 }
 
 /**

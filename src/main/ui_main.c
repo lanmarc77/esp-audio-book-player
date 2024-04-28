@@ -245,7 +245,6 @@ void UI_MAIN_setWakeupTimer(uint64_t timer){
 #define UI_MAIN_RUN_SM_SETUP_MENU 13
 #define UI_MAIN_RUN_SM_BOOK_SCAN 15 
 #define UI_MAIN_RUN_SM_PAUSED 20
-#define UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP 22
 #define UI_MAIN_RUN_SM_PLAY_INIT 24
 #define UI_MAIN_RUN_SM_PLAYING 25
 
@@ -336,7 +335,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                 case 0: saveFlag=1;sleepOffSM=1;
                         break;
                 case 1:
-                        SCREENS_switchingOff(SD_CARD_getSize(),SAVES_getUsedSpaceLevel());
+                        SCREENS_switchingOff(SD_CARD_getSize(),SAVES_getUsedSpaceLevel(),SAVES_cleanOldBookmarks(1));
                         UI_MAIN_sdPlayMsgSend.msgType=SD_PLAY_MSG_TYPE_STOP_PLAY;
                         SD_PLAY_sendMessage(&UI_MAIN_sdPlayMsgSend,100);
                         for(uint16_t i=0;i<300;i++){//300*10ms=3s
@@ -355,7 +354,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                         UI_MAIN_searchId=NULL;
                         UI_MAIN_searchString=NULL;
                         if(SAVES_getUsedSpaceLevel()>=75){
-                            SAVES_cleanOldBookmarks();
+                            SAVES_cleanOldBookmarks(0);
                         }
                         if(SAVES_loadSettings(&UI_MAIN_settings)==0){
                             UI_MAIN_volume=UI_MAIN_settings.volume;
@@ -460,7 +459,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
                             mainSM=UI_MAIN_RUN_SM_SETUP_MENU;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){//TODO: go to a settings screen/setup, switch off for now
-                            SCREENS_switchingOff(SD_CARD_getSize(),SAVES_getUsedSpaceLevel());
+                            SCREENS_switchingOff(SD_CARD_getSize(),SAVES_getUsedSpaceLevel(),SAVES_cleanOldBookmarks(1));
                             if(UI_MAIN_isImagePersisted()==0){
                                 UI_MAIN_persistImage();
                             }
@@ -578,7 +577,6 @@ char UI_MAIN_pcWriteBuffer[2048];
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                                 mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                                mainSM=UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP;
                             }
                         }else if(pauseMode==1){//with time selection
                             if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
@@ -617,35 +615,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                                 mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                                mainSM=UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP;
                             }
-                        }
-                    }
-                    break;
-            case UI_MAIN_RUN_SM_SLEEP_TIMER_SETUP:
-                    SCREENS_sleepTimer(sleepTimeSetupS);
-                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
-                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
-                            if(sleepTimeSetupS>60){
-                                sleepTimeSetupS-=60;
-                            }else{
-                                sleepTimeSetupS=60;
-                            }
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
-                            if(sleepTimeSetupS<99*60){
-                                sleepTimeSetupS+=60;
-                            }else{
-                                sleepTimeSetupS=99*60;
-                            }
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
-                            sleepTimeOffTime=esp_timer_get_time()+(sleepTimeSetupS*1000000);
-                            mainSM=UI_MAIN_RUN_SM_PAUSED;
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
-                            sleepTimeOffTime=0;
-                            mainSM=UI_MAIN_RUN_SM_PAUSED;
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                            sleepTimeOffTime=0;
-                            mainSM=UI_MAIN_RUN_SM_PAUSED;
                         }
                     }
                     break;
@@ -684,14 +654,18 @@ char UI_MAIN_pcWriteBuffer[2048];
                     break;
             case UI_MAIN_RUN_SM_PLAYING:
                     if(!UI_ELEMENTS_isDisplayOff()){
-                        if(((now-lastPlayOverlayChangedTime)/1000)<2000){
-                            SCREENS_playOverlay(playOverlayMode,UI_MAIN_volume,currentPlaySpeed,currentEqualizer,currentRepeatMode);
+                        if(((now-lastPlayOverlayChangedTime)/1000)<3000){
+                            SCREENS_playOverlay(playOverlayMode,UI_MAIN_volume,currentPlaySpeed,currentEqualizer,currentRepeatMode,sleepTimeSetupS,sleepTimeOffTime);
                         }else{
                             playOverlayActive=false;
                             if(((now-lastPlayOverlayChangedTime)/1000)>10000){//wait longer for the overlay to switch back to volume setting first
                                 playOverlayMode=0;
                             }
-                            SCREENS_play(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],currentPlayMinute,currentPlaySecond,percent,currentRepeatMode,allPlayMinute,allPlaySecond,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
+                            if(playOverlayMode==0){
+                                SCREENS_play(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],currentPlayMinute,currentPlaySecond,percent,currentRepeatMode,allPlayMinute,allPlaySecond,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime),0);
+                            }else{
+                                SCREENS_play(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],currentPlayMinute,currentPlaySecond,percent,currentRepeatMode,allPlayMinute,allPlaySecond,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime),(now-lastPlayOverlayChangedTime)/1000);
+                            }
                         }
                     }
                     QueueHandle_t rx=NULL;
@@ -764,6 +738,17 @@ char UI_MAIN_pcWriteBuffer[2048];
                                                     SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume);
                                                     break;
                                         case 1:
+                                                    if(sleepTimeSetupS>60){
+                                                        if(sleepTimeOffTime!=0){
+                                                            sleepTimeSetupS-=60;
+                                                        }
+                                                        sleepTimeOffTime=esp_timer_get_time()+(sleepTimeSetupS*1000000);
+                                                    }else{
+                                                        sleepTimeSetupS=0;
+                                                        sleepTimeOffTime=0;
+                                                    }
+                                                    break;
+                                        case 2:
                                                     if(currentPlaySpeed>50){
                                                         currentPlaySpeed-=5;
                                                     }
@@ -776,12 +761,12 @@ char UI_MAIN_pcWriteBuffer[2048];
                                                         UI_MAIN_cpuNormal();
                                                     }
                                                     break;
-                                        case 2:     if(currentEqualizer>0){
+                                        case 3:     if(currentEqualizer>0){
                                                         currentEqualizer--;
                                                     }
                                                     SD_PLAY_setEqualizer(currentEqualizer);
                                                     break;
-                                        case 3:     if(currentRepeatMode&UI_MAIN_REPEAT_FOLDER){
+                                        case 4:     if(currentRepeatMode&UI_MAIN_REPEAT_FOLDER){
                                                         currentRepeatMode&=~UI_MAIN_REPEAT_FOLDER;
                                                     }else{
                                                         currentRepeatMode|=UI_MAIN_REPEAT_FOLDER;
@@ -804,6 +789,18 @@ char UI_MAIN_pcWriteBuffer[2048];
                                                     SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume);
                                                     break;
                                         case 1:
+                                                    if(sleepTimeSetupS<99*60){
+                                                        if(sleepTimeOffTime!=0){
+                                                            sleepTimeSetupS+=60;
+                                                        }
+                                                        if(sleepTimeSetupS==0) sleepTimeSetupS=60;
+                                                        sleepTimeOffTime=esp_timer_get_time()+(sleepTimeSetupS*1000000);
+                                                    }else{
+                                                        sleepTimeSetupS=99*60;
+                                                        sleepTimeOffTime=esp_timer_get_time()+(sleepTimeSetupS*1000000);
+                                                    }
+                                                    break;
+                                        case 2:
                                                     if(currentPlaySpeed<250){
                                                         currentPlaySpeed+=5;
                                                     }
@@ -816,12 +813,12 @@ char UI_MAIN_pcWriteBuffer[2048];
                                                         UI_MAIN_cpuNormal();
                                                     }
                                                     break;
-                                        case 2:     if(currentEqualizer<6){
+                                        case 3:     if(currentEqualizer<6){
                                                         currentEqualizer++;
                                                     }
                                                     SD_PLAY_setEqualizer(currentEqualizer);
                                                     break;
-                                        case 3:     if(currentRepeatMode&UI_MAIN_REPEAT_FOLDER){
+                                        case 4:     if(currentRepeatMode&UI_MAIN_REPEAT_FOLDER){
                                                         currentRepeatMode&=~UI_MAIN_REPEAT_FOLDER;
                                                     }else{
                                                         currentRepeatMode|=UI_MAIN_REPEAT_FOLDER;
@@ -832,9 +829,8 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 lastPlayOverlayChangedTime=now;playOverlayActive=true;
                             }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
                                 if(playOverlayActive){
-                                    if(playOverlayMode<3){
+                                    if(playOverlayMode<4){
                                         playOverlayMode++;
-                                        //if(playOverlayMode==2) playOverlayMode=3; //for now skip equalizer mode
                                     }else{
                                         playOverlayMode=0;
                                     }
@@ -957,6 +953,7 @@ typedef struct UI_MAIN_setupMenuDataStruct{
     uint8_t selectedSub;
     uint64_t lastMinuteChangedTime;
     uint64_t wakeupTimeSetupS;
+    int32_t numberOfBookmarks;
 }UI_MAIN_setupMenuData_t;
 UI_MAIN_setupMenuData_t UI_MAIN_setupMenuData;
 
@@ -966,6 +963,7 @@ UI_MAIN_setupMenuData_t UI_MAIN_setupMenuData;
 #define UI_MAIN_SETUP_MENU_SM_SCREEN_SETUP 15
 #define UI_MAIN_SETUP_MENU_SM_ROT_DIR 20
 #define UI_MAIN_SETUP_MENU_SM_ROT_SPEED 25
+#define UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE 30
 #define UI_MAIN_SETUP_MENU_SM_CLEANUP 250
 
 /**
@@ -982,17 +980,18 @@ uint8_t UI_MAIN_setupMenu(){
                     UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                     UI_MAIN_setupMenuData.lastMinuteChangedTime=esp_timer_get_time()-5*1000000;
                     memset(&keyMessage,0,sizeof(UI_MAIN_keyMessages_t));
+                    UI_MAIN_setupMenuData.numberOfBookmarks=SAVES_cleanOldBookmarks(1);
                     break;
         case UI_MAIN_SETUP_MENU_SUB_SELECTION:
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(UI_MAIN_setupMenuData.selectedSub==0){
-                                UI_MAIN_setupMenuData.selectedSub=3;
+                                UI_MAIN_setupMenuData.selectedSub=4;
                             }else{
                                 UI_MAIN_setupMenuData.selectedSub--;
                             }
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
-                            if(UI_MAIN_setupMenuData.selectedSub==3){
+                            if(UI_MAIN_setupMenuData.selectedSub==4){
                                 UI_MAIN_setupMenuData.selectedSub=0;
                             }else{
                                 UI_MAIN_setupMenuData.selectedSub++;
@@ -1010,6 +1009,9 @@ uint8_t UI_MAIN_setupMenu(){
                                         break;
                                 case 3: //rotary encoder speed
                                         UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_ROT_SPEED;
+                                        break;
+                                case 4: //bookmark deletion
+                                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE;
                                         break;
                             }
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
@@ -1031,8 +1033,11 @@ uint8_t UI_MAIN_setupMenu(){
                         case 3: //rotary encoder speed
                                 SCREENS_rotSpeedSetup(UI_MAIN_settings.rotaryEncoderSpeed,0);
                                 break;
+                        case 4: //bookmark deletion
+                                SCREENS_bookmarkDeletionSetup(UI_MAIN_setupMenuData.numberOfBookmarks,0);
+                                break;
                     }
-                    UI_ELEMENTS_numberSelect(0,0,UI_MAIN_setupMenuData.selectedSub+1,4,1);
+                    UI_ELEMENTS_numberSelect(0,0,UI_MAIN_setupMenuData.selectedSub+1,5,1);
                     UI_ELEMENTS_update();
                     break;
         case UI_MAIN_SETUP_MENU_SM_WAKEUP_TIMER:
@@ -1144,6 +1149,22 @@ uint8_t UI_MAIN_setupMenu(){
                             }
                             rotary_encoder_set_speed(UI_MAIN_settings.rotaryEncoderSpeed);
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    break;
+        case UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE:
+                    SCREENS_bookmarkDeletionSetup(UI_MAIN_setupMenuData.numberOfBookmarks,1);
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            SAVES_cleanOldBookmarks(15);
+                            UI_MAIN_setupMenuData.numberOfBookmarks=SAVES_cleanOldBookmarks(1);
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
