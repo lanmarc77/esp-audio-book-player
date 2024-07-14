@@ -299,6 +299,11 @@ void UI_ELEMENTS_mainSymbol(uint8_t symbol){
         SSD1306_printStr(0,1,"   Bookmarks    ");
         SSD1306_printStr(0,2,"?????? -> 0     ");
         SSD1306_printStr(0,3,"       ?        ");
+    }else if(symbol==21){//brightness setup
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1,"\\\\\\\\\\\\   //////");
+        SSD1306_printStr(0,2,"      xxx       ");
+        SSD1306_printStr(0,3,"//////   \\\\\\\\\\\\");
     }
 }
 
@@ -601,6 +606,17 @@ void UI_ELEMENTS_init(){
   */
  void UI_ELEMENTS_rotate(uint8_t rotate){
     ssd1306_rotate(SSD1306_dev,rotate);
+}
+
+
+/**
+  * @brief sets the brightness of the used display
+  * 
+  * @param rotate 0=off/minimum ...255=maximum
+  *
+  */
+void UI_ELEMENTS_setBrightness(uint8_t brightness){
+    ssd1306_setContrast(SSD1306_dev,brightness);
 }
 
 #endif

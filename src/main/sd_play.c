@@ -20,7 +20,7 @@
  * functions are used for this.
  * The pipeline is built like this:
  * 
- *   Decoder  -> VolumeFilter -> I²S Driver
+ *   Decoder  -> VolumeFilter -> speed -> equalizer -> I²S Driver
  *      ^
  *      |
  *      v
@@ -37,6 +37,8 @@
  * To counteract this the VolumeFilter adds an initial silence of a few milliseconds after the start of the pipeline.
  * The VolumeFilter also takes care of adjusting the decoded samples volume based on an x⁴ curve and upmixes single
  * channel samples to stereo with identical left and right samples.
+ * The ESP-ADF builtin speed filter increases or decreases play speed.
+ * The ESP-ADF builtin equalizer filter adds equalizer settings.
  * Finally the I²S driver outputs the samples on the connected DAC.
  * 
  * VolumeFiler and I²S driver are created and initialized once and assigned a new pipeline whenever a file should be played.
@@ -510,6 +512,11 @@ esp_err_t SD_PLAY_i2sSetup(int32_t sampleRate, int16_t bits, int16_t channels){
         SD_PLAY_lastSetupBits=bits;
         SD_PLAY_lastSetupChannels=channels;
         esp_err_t ret=i2s_stream_set_clk(SD_PLAY_i2sStreamWriter, sampleRate, bits, channels);
+        if(ret!=ESP_OK){
+            ESP_LOGE(SD_PLAY_LOG_TAG,"ERROR Could not set new i²s clock values.");
+        }else{
+            ESP_LOGI(SD_PLAY_LOG_TAG,"New i²s clock values set to %li Hz,%i bit,%i channel",sampleRate, bits, channels);
+        }
         SD_PLAY_HW_UNMUTE();
         return ret;
     }
@@ -553,9 +560,16 @@ void SD_PLAY_playLoopThread(){
                     music_info.sample_rates, music_info.bits, music_info.channels,music_info.duration);
             audio_element_info_t i2s_info = {0};
             audio_element_getinfo(SD_PLAY_i2sStreamWriter, &i2s_info);
-            if((i2s_info.sample_rates!=music_info.sample_rates)||(i2s_info.bits!=music_info.bits)){
-                ESP_LOGE(SD_PLAY_LOG_TAG,"I2S and decoder disagree, choosing decoder %i,%i,%i",music_info.sample_rates, music_info.bits, music_info.channels);
-                SD_PLAY_i2sSetup(music_info.sample_rates, music_info.bits, i2s_info.channels);
+            if(SD_PLAY_stereoUpMix){//in stereo upmix ignore channels as the pipeline does the upmixing to two channels
+                if((i2s_info.sample_rates!=music_info.sample_rates)||(i2s_info.bits!=music_info.bits)){
+                    ESP_LOGE(SD_PLAY_LOG_TAG,"I2S and decoder disagree, choosing decoder %i,%i,%i",music_info.sample_rates, music_info.bits, i2s_info.channels);
+                    SD_PLAY_i2sSetup(music_info.sample_rates, music_info.bits, i2s_info.channels);
+                }
+            }else{
+                if((i2s_info.sample_rates!=music_info.sample_rates)||(i2s_info.bits!=music_info.bits)||(i2s_info.channels!=music_info.channels)){
+                    ESP_LOGE(SD_PLAY_LOG_TAG,"I2S and decoder disagree, choosing decoder %i,%i,%i",music_info.sample_rates, music_info.bits, music_info.channels);
+                    SD_PLAY_i2sSetup(music_info.sample_rates, music_info.bits, music_info.channels);
+                }
             }
             continue;
         }else
@@ -667,6 +681,8 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
             SD_PLAY_musicFormatDecoder= amr_decoder_init(&amr_cfg);
             audio_element_set_read_cb(SD_PLAY_musicFormatDecoder, SD_PLAY_amrReadCb, NULL);
             if(FORMAT_HELPER_getAMRFormatInformation(SD_PLAY_currentPlayfile,&sampleRate,&bits,&channels,&SD_PLAY_offset,&SD_PLAY_bitrate,&SD_PLAY_blockSize,SD_PLAY_currentFileSize,&SD_PLAY_stereoUpMix)==0){
+                //SD_PLAY_stereoUpMix=false;
+                //channels=1;
                 ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting AMR: %lu,%lu,%lu",sampleRate,bits,channels);
                 audio_element_set_music_info(SD_PLAY_volumeFilter,sampleRate,channels,bits);
                 if(SD_PLAY_i2sSetup(sampleRate, bits, channels)!=ESP_OK){

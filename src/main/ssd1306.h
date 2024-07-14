@@ -68,6 +68,14 @@ void ssd1306_delete(ssd1306_handle_t dev);
 esp_err_t ssd1306_rotate(ssd1306_handle_t dev,uint8_t rotate);
 
 /**
+ * @brief   sets the contrast of bank0
+ *
+ * @param   dev object handle of ssd1306
+ * @param   contrast 0=off...255=maximum
+ */
+esp_err_t ssd1306_setContrast(ssd1306_handle_t dev,uint8_t contrast);
+
+/**
  * @brief   draw point on (x, y)
  *
  * @param   dev object handle of ssd1306

@@ -229,8 +229,10 @@ uint8_t FORMAT_HELPER_getOGGFormatInformation(FILE* file,int32_t* sampleRate, in
             if((buf[0]=='O')&&(buf[1]=='g')&&(buf[2]=='g')&&(buf[3]=='S')){//final page detected ok
                 uint64_t numberOfSamples=(buf[6]+buf[7]*256+buf[8]*256*256+buf[9]*256*256*256);
                 *blockSize=(fileSize*100)/(100*numberOfSamples/ *sampleRate);
-                ret=0;
+            }else{//if no final page with number of samples is available, make a guess, at least the file can be played and seeked then, even if the time code is wrong
+                *blockSize=3072;
             }
+            ret=0;
         }
     }
     fseek(file,0,SEEK_SET);

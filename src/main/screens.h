@@ -36,6 +36,7 @@ void SCREENS_switchingOff(uint64_t sdSizeMB,uint8_t SPIFFSUsagePercent,int32_t n
 void SCREENS_sleepTimer(uint32_t secondsLeft);
 void SCREENS_wakeupTimer(uint64_t secondsTime,uint8_t blinkMode);
 void SCREENS_screenSetup(uint8_t rotation,uint8_t blinkMode);
+void SCREENS_screenBrightnessSetup(uint8_t brightness,uint8_t blinkMode);
 void SCREENS_rotDirSetup(uint8_t dir,uint8_t blinkMode);
 void SCREENS_rotSpeedSetup(uint8_t speed,uint8_t blinkMode);
 void SCREENS_bookmarkDeletionSetup(int32_t numberOfFiles,uint8_t blinkMode);
