@@ -1,7 +1,7 @@
 # TINAMP: An ESP32 based audio book player build from existing electronics modules
 TINAMP: **T**his **I**s **N**ot **A** **M**usic **P**layer.  
   
-This is a device that is meant to play non-DRM audio books from an SD card and has the following features:  
+This is a device that is meant to play non-DRM audio books from SD cards and has the following features:  
 
 - folder based audio book player, one folder contains all files of one audio book
 - multiple audio books supported (currently max. 9999 on one SD card with presorted index)
@@ -18,7 +18,7 @@ This is a device that is meant to play non-DRM audio books from an SD card and h
 - auto power off
 - firmware upgrades from SD card
 - based on pure esp-idf + esp-adf
-- plays 50hrs+ with 2500mAh 18650 battery
+- plays 50hrs+ with 2800mAh 18650 battery
 - does not need nor use any wireless connection
 - does not track the user in any way
 - charging via USB-C
@@ -34,26 +34,28 @@ development board:
 integrated in an old speaker that otherwise might have landed in the trash:  
 ![image](pictures/speaker_integrated.jpg)  
   
-the portable/smaller prototype version:  
-![image](pictures/mobile_version.jpg)  
+the current portable/smaller prototype version (based on Hammond RL6215 case):  
+![image](pictures/mobile_version2.jpg)  
+  
+first 3d print prototype with 80s vibes:  
+![image](pictures/3dprint_proto_I.jpg)  
+![image](pictures/3dprint_proto_II.jpg)  
   
 [first POC (proof of concept)](pictures/first_poc.jpg)
   
 # Why?
-Currently (2023) one really needs to search hard to find an offline only non tracking audio book player that is
+By the time of this writing (2023) one really needs to search hard to find an offline only non tracking audio book player that is
 able to play files from huge SD cards and at the same time sorts the files based on their name and remembers and
 resumes the last listening position.  
 Many people nowadays will use subscription services with corresponding apps on their smartphone. These services
 and the apps usually track the users build profiles suggest new audio books sell ads and more. Services like these can be canceled at any time. May it be for politics or economic reasons. They usually do not allow you to own the audio book but only sell a license to listen at it for as long as the company exists or is allowed to do business with you.  
 I have an audio book collection that I created by only buying if I can download the files or copy them e.g. from a CD to keep them. Without any DRM.  
 All my audio books are converted to and then stored in AMR-WB as for me the quality with 24kBit/s mono is good enough.
-This shrinks an MP3 file to approx. 1/10ths when using AMR-WB and also makes the backup cheap. One CD with AMR-WB
-can hold 60hrs, a DVD 350hrs, a 25GB BD-R 2000hrs+.  
-Using existing electronics hardware modules and the software of this repository I can now build a device that
-just plays my audio books. Not more, not less. And it most likely will do so in 30years assuming nothing breaks.
+This shrinks an MP3 file to approx. 1/10ths when using AMR-WB and also makes the backup cheap. One CD with AMR-WB can hold 60hrs, a DVD 350hrs, a 25GB BD-R 2000hrs+.  
+A 256GB SD card can hold around 2 years and 9 months of continuous listening in AMR-WB. Multiple SD cards can hold enough listening material for a life time.  
+Using existing electronics hardware modules and the software of this repository I can now build a device that just plays my audio books. Not more, not less. And it most likely will do so in 30years assuming nothing breaks.
 There are still 30yrs+ old Nintendo Gameboys that work like a charm and are being refurbished.  
-Additionally I can change the behavior of the software as I like. The whole development environment works offline
-and can also be installed in an offline virtual machine and will still be able to compile even if the hardware manufacturer of the main controller board does not exist anymore.  
+Additionally I can change the behavior of the software as I like. The whole development environment works offline and can also be installed in an offline virtual machine and will still be able to compile even if the hardware manufacturer of the main controller board does not exist anymore.  
   
 # Videos
 Download and watch:  
@@ -137,7 +139,7 @@ First prototype PCB:
   
 ## Printed/buyable case
 WIP: 3D case model  
-TODO: worldwide buyable model  
+TODO: worldwide buyable model (most likely the Hammond RL6215)  
   
 ## Current measurements / battery life
 The runtime of the system is highly dependent on the current consumption. The current consumption depends on the
@@ -173,14 +175,16 @@ setting x1.0.
 | any file from before                 | 100% | ~105mA |
   
 At high volumes the energy needed by the speaker dominates the current consumption. Also the current is not very stable and highly depends on the content that is actually played.  
-The volume setting actually follows an x⁴ curve for translating % into power to fit our hearing.  
+The volume setting follows an x⁴ curve for translating % into power to fit our hearing.  
 Depending on play speed settings the current consumption rises. This is due to the fact that more data needs to be handled and the CPU frequency is stepped up. Approximately 2mA per 0.1 step speed up.  
   
-Real life tests resulted in a runtime of 54hrs:05mins playing 24kbit/s amr audio on QKZ AK6 earphones at 50% volume with a Murata / Sony Konion US18650VTC5D 2800mAh battery on firmware v00.00.08 (normal speed, no equalizer). A full charge after this test took 5hrs:15mins.  
+Real life tests resulted in a runtime of 54hrs:05mins playing 24kbit/s amr audio on QKZ AK6 earphones at 50% volume with a Murata / Sony Konion US18650VTC5D 2800mAh battery on firmware v00.00.08 (normal speed, no equalizer) from a 256GB Transcend SD card. A full charge after this test took 5hrs:15mins.  
   
 # UI and player navigation
 The following sub chapters explain the states of the player and the different menus or screens the player shows.  
-You might want to watch the videos above for a shorter introduction.  
+You might want to watch the videos above for a short(er) introduction.  
+  
+The most common use case of an audio book player is powering it on, resume playing (maybe pause from time to time) and switching it off. This is currently done by pressing the rotary knob (for power on) which takes around 2s to right away jump into the last listened audio book and listening position, followed by another press of the rotary knob to start playing. Pressing the rotary knob while playing will pause the audio book player (and saves the listening position). Leaving it paused for 60s will power off automatically.  
   
 ## The rotary encoder
 The only input device is a rotary encoder with a button. They are usually used as:  
@@ -526,30 +530,30 @@ Also shows the size of the detected SD card, the number of stored bookmarks and 
 ```
    wakeup timer         screen rotation
  ----------------      ----------------  
-|       1/5      |    |       2/5      |
+|       1/6      |    |       2/6      |
 |(-_-)  ->  (o_o)| -> |   -------->    |
 |                |    |  |    0    |   |
 |      01:00     |    |   <--------    |
  ----------------      ----------------
         ^                     |
         |                     v
-        |               rotary encoder
-        |                 direction
-        |              ----------------  
-        |             |       3/5      |
-        |             | o o            |
-        |             |o   o    -->+   |
-        |             | o o            |
-        |              ----------------
-        |                     |
-        |                     v
-     bookmark           rotary encoder
-     deletion               speed
+     bookmark          screen brightness
+     deletion              settings
  ----------------      ----------------  
-|       5/5      |    |       4/5      |
-|   Bookmarks    | <- | o o            |
-|    10 -> 0     |    |o   o     x1    |
-|       ?        |    | o o            |
+|       6/6      |    |       3/6      |
+|   Bookmarks    |    |\\\\\\    //////|
+|    10 -> 0     |    |       100      |
+|       ?        |    |//////    \\\\\\|
+ ----------------      ----------------
+        ^                     |
+        |                     v
+  rotary encoder         rotary encoder
+      speed                direction
+ ----------------      ----------------  
+|       5/6      |    |       4/6      |
+| o o            | <- | o o            |
+|o   o     x1    |    |o   o    -->+   |
+| o o            |    | o o            |
  ----------------      ----------------
 ```
 After entering the global settings the rotary knob can be used to select the setting to change.  
@@ -580,6 +584,18 @@ Once the timer was activated its setup time starts counting **after** the player
  ----------------
 ```
 This allows rotating the screen by 180°. 0 stands for default and 180 for 180° rotated setting.  
+This setting is stored and reloaded on each player start.  
+  
+#### Screen brightness setup
+```
+ ----------------
+|                |
+|\\\\\\    //////|
+|       100      |
+|//////    \\\\\\|
+ ----------------
+```
+This allows to setup the brightness of the screen. Step size is +/-5 and ranges from 0 to 250.  
 This setting is stored and reloaded on each player start.  
   
 #### Rotary encoder direction setup
@@ -826,7 +842,7 @@ This projects implementation has two options of displaying and playing sorted en
 ### Sorting each time
 This is the default implementation. After startup when the list of all available audio books is read this list is sorted.
 Instead of keeping the strings/names of all entries in memory only their file allocation table position is used. This position acts as kind of ID of the entry. This ID is then sorted inside an array but not by its value but by its corresponding name.
-But this also means that the algorithm always has to translate between ID and name of the file resulting in an increased
+This means that the algorithm always has to translate between ID and name of the file resulting in an increased
 time of sorting. The algorithm used is a selection sort with a complexity of O(n²). But it is memory deterministic.  
 This allows keeping 1000 entries with only 2kB of memory usage. To always wait for 1000 entries to be sorted is also still acceptable.  
 Sorting speed is also determined by the way entries are named. As the C function strcmp is starting to compare at the beginning of a string the earlier a mismatch happens the earlier it can stop. It is beneficial to name files e.g. 01... , 02... instead of ...01, ...02.  
@@ -844,11 +860,14 @@ The following command chain can be used in the root directory of the SD card to 
 Names of entries are expected to be in code page 437 format as this is the only one that is enabled in the ESP32. I did not wanted to make things more complicated by supporting all kinds of character encodings.  
 9999 entries=audio books with an average length of an audio book of 6hrs would take almost 55 years of listening if you listen every single day for 3hrs.  
   
-Assuming AMR-WB file format with 24kbit/s the SD card would need to have ~618GB.  
-Assuming MP3 file format with 128kbit/s the SD card would need to have ~3.3TB.  
-These are the implementation limits which should not be relevant much while using the player.  
+For this 9999 entries limit to kick in:  
+
+-  for AMR-WB file format with 24kbit/s an SD card would need to have ~618GB  
+-  for MP3 file format with 128kbit/s an SD card would need to have ~3.3TB  
+
+This implementation limit should not be relevant much while using the player.  
   
-As the files within a directory/audio book are usually below 1000 the presorted.txt is not implemented for these.
+As the number of files within a directory/audio book are usually below 1000 the presorted.txt is not implemented for these.
   
 ## Bookmarks
 I decided to implement the bookmark storage inside the SPIFFS of the ESP32. I reserved 512kB for the SPIFFS. The
@@ -860,8 +879,9 @@ Each bookmark is written when the player is paused or is powered off by one of t
 or sleep timer. A bookmark is a file in the SPIFFS. The name of the file is an MD5 hash constructed from the directory
 name of the audio book. Inside the bookmark the listening position is stored and the file name that was currently played.  
   
-Depending on the length of the file name bookmarks take more or less space in SPIFFS. On average 1kb can be assumed. This means around 500 bookmarks can be stored. Deleting individual bookmarks is not possible. But by using the reset procedure all bookmarks can be deleted. The off screen displays the usage of the SPIFFS in percent.  
-There is an automatic house keeping implemented. If the SPIFFS usage level is above 75% the SD card and the bookmarks are scanned. If there are bookmarks for which no fitting directory on the SD card exists this bookmark is deleted. This house keeping is based on the use case that SD cards are being swapped and around 500 audio books is the average on one of the SD cards.  
+Depending on the length of the file name bookmarks take more or less space in SPIFFS. On average 1kb can be assumed. This means around 500 bookmarks can be stored. Deleting individual bookmarks is not possible. To delete all bookmarks one can use the overall reset procedure or starting with firmware v00.00.08 the global settings menu, sub menu delete bookmarks.  
+The powering off screen displays the usage of the SPIFFS in percent and the number of bookmarks.  
+There is also an automatic bookmark deletion procedure implemented. If the SPIFFS usage level is above 75% the currently used SD card and the bookmarks are scanned and compared. If there are bookmarks in the SPIFFS for which no fitting directory on the SD card exists this bookmark is deleted. This house keeping idea is based on the use case that SD cards are being rewritten over and over with new audio books where the old ones are deleted. Ideally for this use case one should never be needed to manually delete old bookmarks.  
   
 Manual bookmarks are not supported. Mainly because I personally never needed them but also because house keeping gets
 much more complicated as well as a method of jumping to different bookmarks inside the same audio book must be implemented.  
@@ -869,7 +889,7 @@ much more complicated as well as a method of jumping to different bookmarks insi
 ## CBR/VBR
 Only fully supported are CBR encoded files. The player also plays VBR files but the displayed timestamps might be wrong.
 Without scanning the full file or implementing code for the various VBR indexes there is no way to determine a correlation of file position and time.  
-The format handler functions takes a look at the first frame of a file to determine the bitrate and therefore the frame length of a file.  
+The format handler functions take a look at the first frame of a file to determine the bitrate and therefore the frame length of a file. This data is then assumed to be valid for the whole file.  
   
 ## Metadata
 No metadata of files is used. This includes chapter indexes, subtitles or cover pictures.  
@@ -877,7 +897,7 @@ No metadata of files is used. This includes chapter indexes, subtitles or cover 
 ## Bluetooth audio
 The used µC board uses the ESP32-S3. This newer model of the ESP32 does not support the so called classic Bluetooth
 audio stack which uses SBC as codec. It only supports the not yet widely used Bluetooth Audio LE. The esp-adf does
-not yet support a pipeline element that uses Bluetooth Audio LE. Once support is added and devices are getting more common. I might implement support for it.  
+not yet support a pipeline element that uses Bluetooth Audio LE. Once support is added in the esp-adf pipeline system and devices are getting more common I might implement support for it.  
 It might also be possible to make this project compile with the classic ESP32 that does support classic Bluetooth using SBC.
 But I do not plan for this as I use headphones with a jack and no extra battery I need to take care of.  
   

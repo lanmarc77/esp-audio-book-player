@@ -357,6 +357,12 @@ char UI_MAIN_pcWriteBuffer[2048];
                             SAVES_cleanOldBookmarks(0);
                         }
                         if(SAVES_loadSettings(&UI_MAIN_settings)==0){
+                            if(UI_MAIN_settings.brightness!=0){
+                                UI_ELEMENTS_setBrightness(UI_MAIN_settings.brightness);
+                            }else{
+                                UI_MAIN_settings.brightness=1;
+                                UI_ELEMENTS_setBrightness(1);
+                            }
                             UI_MAIN_volume=UI_MAIN_settings.volume;
                             if(UI_MAIN_settings.sleepTimeSetupS<60){
                                 UI_MAIN_settings.sleepTimeSetupS=UI_MAIN_DEFAULT_SLEEP_TIME_S;
@@ -580,16 +586,19 @@ char UI_MAIN_pcWriteBuffer[2048];
                             }
                         }else if(pauseMode==1){//with time selection
                             if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
-                                currentPlaySecond=0;
-                                if((now-lastMinuteChangedTime)>50000){
-                                    if(newPlayMinute!=0){
-                                        newPlayMinute--;
-                                    }
+                                if(currentPlaySecond!=0){
+                                    currentPlaySecond=0;
                                 }else{
-                                    if(newPlayMinute>=5){
-                                        newPlayMinute-=5;
+                                    if((now-lastMinuteChangedTime)>50000){
+                                        if(newPlayMinute!=0){
+                                            newPlayMinute--;
+                                        }
                                     }else{
-                                        newPlayMinute=0;
+                                        if(newPlayMinute>=5){
+                                            newPlayMinute-=5;
+                                        }else{
+                                            newPlayMinute=0;
+                                        }
                                     }
                                 }
                                 lastMinuteChangedTime=now;
@@ -961,9 +970,10 @@ UI_MAIN_setupMenuData_t UI_MAIN_setupMenuData;
 #define UI_MAIN_SETUP_MENU_SUB_SELECTION 5
 #define UI_MAIN_SETUP_MENU_SM_WAKEUP_TIMER 10
 #define UI_MAIN_SETUP_MENU_SM_SCREEN_SETUP 15
-#define UI_MAIN_SETUP_MENU_SM_ROT_DIR 20
-#define UI_MAIN_SETUP_MENU_SM_ROT_SPEED 25
-#define UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE 30
+#define UI_MAIN_SETUP_MENU_SM_SCREEN_BRIGHTNESS 20
+#define UI_MAIN_SETUP_MENU_SM_ROT_DIR 25
+#define UI_MAIN_SETUP_MENU_SM_ROT_SPEED 30
+#define UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE 35
 #define UI_MAIN_SETUP_MENU_SM_CLEANUP 250
 
 /**
@@ -986,12 +996,12 @@ uint8_t UI_MAIN_setupMenu(){
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(UI_MAIN_setupMenuData.selectedSub==0){
-                                UI_MAIN_setupMenuData.selectedSub=4;
+                                UI_MAIN_setupMenuData.selectedSub=5;
                             }else{
                                 UI_MAIN_setupMenuData.selectedSub--;
                             }
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
-                            if(UI_MAIN_setupMenuData.selectedSub==4){
+                            if(UI_MAIN_setupMenuData.selectedSub==5){
                                 UI_MAIN_setupMenuData.selectedSub=0;
                             }else{
                                 UI_MAIN_setupMenuData.selectedSub++;
@@ -1004,13 +1014,16 @@ uint8_t UI_MAIN_setupMenu(){
                                 case 1: //screen rotation
                                         UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_SCREEN_SETUP;
                                         break;
-                                case 2: //rotary encoder direction
+                                case 2: //screen rotation
+                                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_SCREEN_BRIGHTNESS;
+                                        break;
+                                case 3: //rotary encoder direction
                                         UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_ROT_DIR;
                                         break;
-                                case 3: //rotary encoder speed
+                                case 4: //rotary encoder speed
                                         UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_ROT_SPEED;
                                         break;
-                                case 4: //bookmark deletion
+                                case 5: //bookmark deletion
                                         UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE;
                                         break;
                             }
@@ -1027,17 +1040,20 @@ uint8_t UI_MAIN_setupMenu(){
                         case 1: //screen rotation
                                 SCREENS_screenSetup(UI_MAIN_settings.screenRotation,0);
                                 break;
-                        case 2: //rotary encoder direction
+                        case 2: //screen brightness
+                                SCREENS_screenBrightnessSetup(UI_MAIN_settings.brightness-1,0);
+                                break;
+                        case 3: //rotary encoder direction
                                 SCREENS_rotDirSetup(UI_MAIN_settings.rotaryEncoderDirection,0);
                                 break;
-                        case 3: //rotary encoder speed
+                        case 4: //rotary encoder speed
                                 SCREENS_rotSpeedSetup(UI_MAIN_settings.rotaryEncoderSpeed,0);
                                 break;
-                        case 4: //bookmark deletion
+                        case 5: //bookmark deletion
                                 SCREENS_bookmarkDeletionSetup(UI_MAIN_setupMenuData.numberOfBookmarks,0);
                                 break;
                     }
-                    UI_ELEMENTS_numberSelect(0,0,UI_MAIN_setupMenuData.selectedSub+1,5,1);
+                    UI_ELEMENTS_numberSelect(0,0,UI_MAIN_setupMenuData.selectedSub+1,6,1);
                     UI_ELEMENTS_update();
                     break;
         case UI_MAIN_SETUP_MENU_SM_WAKEUP_TIMER:
@@ -1096,6 +1112,32 @@ uint8_t UI_MAIN_setupMenu(){
                                 UI_MAIN_settings.screenRotation=1;
                             }
                             UI_ELEMENTS_rotate(UI_MAIN_settings.screenRotation);
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    break;
+        case UI_MAIN_SETUP_MENU_SM_SCREEN_BRIGHTNESS:
+                    SCREENS_screenBrightnessSetup(UI_MAIN_settings.brightness-1,1);
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            if(UI_MAIN_settings.brightness>5){
+                                UI_MAIN_settings.brightness-=5;
+                            }else{
+                                UI_MAIN_settings.brightness=1;
+                            }
+                            UI_ELEMENTS_setBrightness(UI_MAIN_settings.brightness);
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            if(UI_MAIN_settings.brightness<251){
+                                UI_MAIN_settings.brightness+=5;
+                            }else{
+                                UI_MAIN_settings.brightness=251;
+                            }
+                            UI_ELEMENTS_setBrightness(UI_MAIN_settings.brightness);
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){

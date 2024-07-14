@@ -49,6 +49,7 @@ typedef struct{
     uint8_t screenRotation;
     uint8_t rotaryEncoderSpeed;
     uint8_t rotaryEncoderDirection;
+    uint8_t brightness;
 }SAVES_settings_t;
 
 

@@ -308,6 +308,12 @@ esp_err_t ssd1306_rotate(ssd1306_handle_t dev,uint8_t rotate){
     return ESP_OK;
 }
 
+esp_err_t ssd1306_setContrast(ssd1306_handle_t dev,uint8_t contrast){
+    ssd1306_write_cmd_byte(dev, 0x81); //--set contrast control register
+    ssd1306_write_cmd_byte(dev, contrast); // Set SEG Output Current Brightness
+    return ESP_OK;
+}
+
 esp_err_t ssd1306_init(ssd1306_handle_t dev)
 {
     esp_err_t ret;

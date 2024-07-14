@@ -347,7 +347,7 @@ void SCREENS_wakeupTimer(uint64_t secondsTime,uint8_t blinkMode){
 }
 
 /**
-  * @brief shows the setup screen for setting the wake up timer
+  * @brief shows the setup screen for setting the screen rotation
   *
   * @param rotation 0=normal, 1=rotated
   * @param blinkMode 1=numbers blink, 0=no blinking
@@ -374,6 +374,38 @@ void SCREENS_screenSetup(uint8_t rotation,uint8_t blinkMode){
     }
 }
 
+/**
+  * @brief shows the setup screen for setting the screen brightness
+  *
+  * @param brightness 0=off/minimal, 255=maximum
+  * @param blinkMode 1=numbers blink, 0=no blinking
+  * 
+  */
+void SCREENS_screenBrightnessSetup(uint8_t brightness,uint8_t blinkMode){
+    uint64_t now=esp_timer_get_time();
+    char b[10];
+    UI_ELEMENTS_cls();
+    UI_ELEMENTS_mainSymbol(21);
+    sprintf(&b[0],"%3i",brightness);
+    if(blinkMode==0){
+        UI_ELEMENTS_textScrolly(6,2,4,&b[0]);
+    }else{
+      if(((now/1000)%1000)<100){
+          sprintf(&b[0],"   ");
+      }
+      UI_ELEMENTS_textScrolly(6,2,4,&b[0]);
+      UI_ELEMENTS_update();
+    }
+}
+
+/**
+  * @brief shows the setup screen for setting the rotation direction of the
+  *        rotary encoder
+  *
+  * @param dir 0=normal/factory default, 1=reversed direction
+  * @param blinkMode 1=numbers blink, 0=no blinking
+  * 
+  */
 void SCREENS_rotDirSetup(uint8_t dir,uint8_t blinkMode){
     uint64_t now=esp_timer_get_time();
     char b[10];
@@ -395,6 +427,14 @@ void SCREENS_rotDirSetup(uint8_t dir,uint8_t blinkMode){
     }
 }
 
+/**
+  * @brief shows the setup screen for setting the rotation speed of the
+  *        rotary encoder
+  *
+  * @param speed 0=1x, 1=0.5x
+  * @param blinkMode 1=numbers blink, 0=no blinking
+  * 
+  */
 void SCREENS_rotSpeedSetup(uint8_t speed,uint8_t blinkMode){
     uint64_t now=esp_timer_get_time();
     char b[10];
@@ -416,6 +456,13 @@ void SCREENS_rotSpeedSetup(uint8_t speed,uint8_t blinkMode){
     }
 }
 
+/**
+  * @brief shows the setup screen for deleting the bookmarks
+  *
+  * @param numberOfFiles the number of bookmarks that are stored
+  * @param blinkMode 1=numbers blink, 0=no blinking
+  * 
+  */
 void SCREENS_bookmarkDeletionSetup(int32_t numberOfFiles,uint8_t blinkMode){
     uint64_t now=esp_timer_get_time();
     char b[10];
