@@ -520,6 +520,9 @@ char UI_MAIN_pcWriteBuffer[2048];
                                     currentRepeatMode=UI_MAIN_saveState.repeatMode;
                                     currentPlayPosition=FORMAT_HELPER_getFilePosByPlayTimeAndExtension(currentPlaySecond,currentPlayMinute,&UI_MAIN_selectedFileName[0],currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,currentPlayChannels);
                                 }
+                                if(UI_MAIN_amountOfFiles==1){
+                                    pauseMode=1;//no need for chapter selection if only one track exists
+                                }
                                 SD_PLAY_setEqualizer(currentEqualizer);
                                 UI_MAIN_screenOnIfNeeded();
                                 UI_MAIN_searchString=NULL;
@@ -751,7 +754,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                                         if(sleepTimeOffTime!=0){
                                                             sleepTimeSetupS-=60;
                                                         }
-                                                        sleepTimeOffTime=esp_timer_get_time()+(sleepTimeSetupS*1000000);
+                                                        sleepTimeOffTime=esp_timer_get_time()+(uint64_t)((uint64_t)sleepTimeSetupS*(uint64_t)1000000);
                                                     }else{
                                                         sleepTimeSetupS=0;
                                                         sleepTimeOffTime=0;
@@ -798,15 +801,15 @@ char UI_MAIN_pcWriteBuffer[2048];
                                                     SD_PLAY_volumeFilterSetVolume(UI_MAIN_volume);
                                                     break;
                                         case 1:
-                                                    if(sleepTimeSetupS<99*60){
+                                                    if(sleepTimeSetupS<480*60){
                                                         if(sleepTimeOffTime!=0){
                                                             sleepTimeSetupS+=60;
                                                         }
                                                         if(sleepTimeSetupS==0) sleepTimeSetupS=60;
-                                                        sleepTimeOffTime=esp_timer_get_time()+(sleepTimeSetupS*1000000);
+                                                        sleepTimeOffTime=esp_timer_get_time()+(uint64_t)((uint64_t)sleepTimeSetupS*(uint64_t)1000000);
                                                     }else{
-                                                        sleepTimeSetupS=99*60;
-                                                        sleepTimeOffTime=esp_timer_get_time()+(sleepTimeSetupS*1000000);
+                                                        sleepTimeSetupS=480*60;
+                                                        sleepTimeOffTime=esp_timer_get_time()+(uint64_t)((uint64_t)sleepTimeSetupS*(uint64_t)1000000);
                                                     }
                                                     break;
                                         case 2:
