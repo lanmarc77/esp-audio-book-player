@@ -322,7 +322,7 @@ void SCREENS_sleepTimer(uint32_t secondsLeft){
         UI_ELEMENTS_textScrolly(7,2,1,&b[0]);
     }else{
       sprintf(&b[0],"m");
-      UI_ELEMENTS_numberSelect(0,2,secondsLeft/60,99,1);
+      UI_ELEMENTS_numberSelect(0,2,secondsLeft/60,480,1);
       UI_ELEMENTS_textScrolly(10,2,1,&b[0]);
     }
     UI_ELEMENTS_update();
