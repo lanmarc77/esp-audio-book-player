@@ -17,6 +17,7 @@
 #include "esp_log.h"
 #include "esp_vfs.h"
 #include "ff_handling.h"
+#include "format_helper.h"
 #include "sd_card.h"
 #include "ui_main.h"
 
@@ -112,16 +113,9 @@ uint8_t FF_getList(char* folderPath,uint16_t* amountOfEntries,uint16_t* sortedId
                     }
                 }
                 if(ffType==1){//check valid file extensions
-                    uint16_t l=strlen(currentEntry->d_name);
-                    if(!((strncasecmp(&currentEntry->d_name[l-3],"mp3",3)==0) ||
-                         (strncasecmp(&currentEntry->d_name[l-3],"awb",3)==0) ||
-                         (strncasecmp(&currentEntry->d_name[l-3],"amr",3)==0) ||
-                         //mpeg4 audio is too buggy and picky in esp-adf
-                         /*(strncasecmp(&currentEntry->d_name[l-3],"m4a",3)==0) ||
-                         (strncasecmp(&currentEntry->d_name[l-3],"aac",3)==0) ||
-                         (strncasecmp(&currentEntry->d_name[l-3],"m4b",3)==0) ||*/
-                         (strncasecmp(&currentEntry->d_name[l-3],"ogg",3)==0)))
-                    {
+                    uint8_t fileFormat=FORMAT_HELPER_getFileType(&currentEntry->d_name[0]);
+                    if((fileFormat==FORMAT_HELPER_FILE_TYPE_UNKNOWN)||(fileFormat==FORMAT_HELPER_FILE_TYPE_M4A)){
+                        //mpeg4 audio is too buggy and picky in esp-adf
                         continue;
                     }
                 }
@@ -251,16 +245,9 @@ uint8_t FF_getNameByID(char* folderBasePath,uint16_t ID,char *resultName,uint8_t
                 continue;
             }
             if(ffType==1){//check valid file extensions
-                uint16_t l=strlen(currentEntry->d_name);
-                if(!((strncasecmp(&currentEntry->d_name[l-3],"mp3",3)==0) ||
-                        (strncasecmp(&currentEntry->d_name[l-3],"awb",3)==0) ||
-                        (strncasecmp(&currentEntry->d_name[l-3],"amr",3)==0) ||
-                         //mpeg4 audio is too buggy and picky in esp-adf
-                        /*(strncasecmp(&currentEntry->d_name[l-3],"m4a",3)==0) ||
-                        (strncasecmp(&currentEntry->d_name[l-3],"aac",3)==0) ||
-                        (strncasecmp(&currentEntry->d_name[l-3],"m4b",3)==0) ||*/
-                        (strncasecmp(&currentEntry->d_name[l-3],"ogg",3)==0)))
-                {
+                uint8_t fileFormat=FORMAT_HELPER_getFileType(&currentEntry->d_name[0]);
+                if((fileFormat==FORMAT_HELPER_FILE_TYPE_UNKNOWN)||(fileFormat==FORMAT_HELPER_FILE_TYPE_M4A)){
+                    //mpeg4 audio is too buggy and picky in esp-adf
                     continue;
                 }
             }

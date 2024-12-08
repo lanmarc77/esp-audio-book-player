@@ -282,7 +282,7 @@ int SD_PLAY_volumeFilterProcess(audio_element_handle_t self, char *buffer, int s
 
 uint64_t SD_PLAY_blockSize=0;
 uint64_t SD_PLAY_offset=0;
-uint32_t SD_PLAY_bitrate=0;
+uint64_t SD_PLAY_bitrate=0;
 int32_t SD_PLAY_channels;
 
 uint8_t SD_PLAY_m4aSM=0;
@@ -629,7 +629,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
     uint16_t length=strlen(file);
     struct stat st;
     if(length<3) return 1;
-    if(strncasecmp(&file[length-3],"mp3",3)==0){
+    if(FORMAT_HELPER_getFileType(file)==FORMAT_HELPER_FILE_TYPE_MP3){
         SD_PLAY_currentPlayfile = fopen(file,"r");
         if((SD_PLAY_currentPlayfile)&&(stat(file, &st)==0)){
             SD_PLAY_currentFileSize=st.st_size;
@@ -640,7 +640,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
             SD_PLAY_musicFormatDecoder= mp3_decoder_init(&mp3_cfg);
             audio_element_set_read_cb(SD_PLAY_musicFormatDecoder, SD_PLAY_mp3ReadCb, NULL);
             if(FORMAT_HELPER_getMP3FormatInformation(SD_PLAY_currentPlayfile,&sampleRate,&bits,&channels,&SD_PLAY_offset,&SD_PLAY_bitrate,&SD_PLAY_blockSize,SD_PLAY_currentFileSize)==0){
-                ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting MP3: %lu,%lu,%lu,%lu",sampleRate,bits,channels,SD_PLAY_bitrate);
+                ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting MP3: %lu,%lu,%lu,%llu",sampleRate,bits,channels,SD_PLAY_bitrate);
                 audio_element_set_music_info(SD_PLAY_volumeFilter,sampleRate,channels,bits);
                 if(SD_PLAY_i2sSetup(sampleRate, bits, channels)!=ESP_OK){
                     ESP_LOGE(SD_PLAY_LOG_TAG,"Presetting MP3 error.");
@@ -649,7 +649,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
         }else{
             return 3;
         }
-    }else if((strncasecmp(&file[length-3],"mp4",3)==0)||(strncasecmp(&file[length-3],"m4a",3)==0)||(strncasecmp(&file[length-3],"aac",3)==0)||(strncasecmp(&file[length-3],"m4b",3)==0)){
+    }else if(FORMAT_HELPER_getFileType(file)==FORMAT_HELPER_FILE_TYPE_M4A){
         SD_PLAY_currentPlayfile = fopen(file,"r");
         if((SD_PLAY_currentPlayfile)&&(stat(file, &st)==0)){
             SD_PLAY_currentFileSize=st.st_size;
@@ -669,7 +669,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
         }else{
             return 3;
         }
-    }else if((strncasecmp(&file[length-3],"awb",3)==0)||(strncasecmp(&file[length-3],"amr",3)==0)){
+    }else if(FORMAT_HELPER_getFileType(file)==FORMAT_HELPER_FILE_TYPE_AMR){
         SD_PLAY_currentPlayfile = fopen(file,"r");
         if((SD_PLAY_currentPlayfile)&&(stat(file, &st)==0)){
             SD_PLAY_currentFileSize=st.st_size;
@@ -683,7 +683,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
             if(FORMAT_HELPER_getAMRFormatInformation(SD_PLAY_currentPlayfile,&sampleRate,&bits,&channels,&SD_PLAY_offset,&SD_PLAY_bitrate,&SD_PLAY_blockSize,SD_PLAY_currentFileSize,&SD_PLAY_stereoUpMix)==0){
                 //SD_PLAY_stereoUpMix=false;
                 //channels=1;
-                ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting AMR: %lu,%lu,%lu",sampleRate,bits,channels);
+                ESP_LOGI(SD_PLAY_LOG_TAG,"Presetting AMR: %lu,%lu,%lu,%llu",sampleRate,bits,channels,SD_PLAY_bitrate);
                 audio_element_set_music_info(SD_PLAY_volumeFilter,sampleRate,channels,bits);
                 if(SD_PLAY_i2sSetup(sampleRate, bits, channels)!=ESP_OK){
                     ESP_LOGE(SD_PLAY_LOG_TAG,"Presetting AMR error.");
@@ -692,7 +692,7 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
         }else{
             return 3;
         }
-    }else if(strncasecmp(&file[length-3],"ogg",3)==0){
+    }else if(FORMAT_HELPER_getFileType(file)==FORMAT_HELPER_FILE_TYPE_OGG){
         SD_PLAY_currentPlayfile = fopen(file,"r");
         if((SD_PLAY_currentPlayfile)&&(stat(file, &st)==0)){
             SD_PLAY_currentFileSize=st.st_size;
