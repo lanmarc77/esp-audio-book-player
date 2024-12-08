@@ -34,16 +34,13 @@
   * @return calculated file byte position, in cases of errors 0 so the file would play from the start
   */
 uint64_t FORMAT_HELPER_getFilePosByPlayTimeAndExtension(uint8_t currentPlaySecond,uint16_t currentPlayMinute,char* fileName,uint64_t currentPlaySize,uint64_t currentPlayOffset,uint64_t currentPlayBlockSize,uint64_t currentPlayBitrate,int32_t channels){
-    uint16_t length=strlen(fileName);
+    uint8_t fileFormat=FORMAT_HELPER_getFileType(fileName);
     uint64_t playPos=0;
-    if(length<3){
-        return 0;
-    }
-    if((strncasecmp(&fileName[length-3],"awb",3)==0)||(strncasecmp(&fileName[length-3],"amr",3)==0)){
+    if(fileFormat==FORMAT_HELPER_FILE_TYPE_AMR){
         playPos=(((currentPlaySecond+currentPlayMinute*60)*50)*currentPlayBlockSize)+currentPlayOffset;
-    }else if(strncasecmp(&fileName[length-3],"mp3",3)==0){
+    }else if(fileFormat==FORMAT_HELPER_FILE_TYPE_MP3){
         playPos=(((currentPlaySecond+currentPlayMinute*60)*1000)*currentPlayBitrate)/8+currentPlayOffset;
-    }else if(strncasecmp(&fileName[length-3],"ogg",3)==0){
+    }else if(fileFormat==FORMAT_HELPER_FILE_TYPE_OGG){
         playPos=((currentPlaySecond+currentPlayMinute*60)*currentPlayBlockSize)+currentPlayOffset;
     }else{
         playPos=(((currentPlaySecond+currentPlayMinute*60)*1000)*currentPlayBitrate)/8+currentPlayOffset;
@@ -74,16 +71,17 @@ uint64_t FORMAT_HELPER_getFilePosByPlayTimeAndExtension(uint8_t currentPlaySecon
   * 
   */
 void FORMAT_HELPER_getPlayTimeByExtension(uint8_t* currentPlaySecond,uint16_t* currentPlayMinute,uint8_t* percent, char* fileName,uint64_t currentPlayPosition,uint64_t currentPlaySize,uint64_t currentPlayOffset,uint64_t currentPlayBlockSize,uint64_t currentPlayBitrate,uint8_t* allPlaySecond,uint16_t* allPlayMinute,int32_t channels){
-    uint16_t length=strlen(fileName);
-    if(length<3){
+    uint8_t fileFormat=FORMAT_HELPER_getFileType(fileName);
+    if(strlen(fileName)<3){
         *percent=0;
         *currentPlayMinute=0;
         *currentPlaySecond=0;
     }
+    if(currentPlayOffset>currentPlayPosition) currentPlayPosition=currentPlayOffset;
     if(((*currentPlayMinute==0)&&(*currentPlaySecond==0))||(currentPlayPosition==0)){
         *percent=0;
     }
-    if((strncasecmp(&fileName[length-3],"awb",3)==0)||(strncasecmp(&fileName[length-3],"amr",3)==0)){
+    if(fileFormat==FORMAT_HELPER_FILE_TYPE_AMR){
         if(currentPlaySize!=0){
             *percent=(currentPlayPosition*100)/currentPlaySize;
         }
@@ -97,7 +95,7 @@ void FORMAT_HELPER_getPlayTimeByExtension(uint8_t* currentPlaySecond,uint16_t* c
                 *allPlaySecond=(((currentPlaySize-currentPlayOffset)/currentPlayBlockSize)/50)%60;
             }
         }
-    }else if(strncasecmp(&fileName[length-3],"mp3",3)==0){
+    }else if(fileFormat==FORMAT_HELPER_FILE_TYPE_MP3){
         if(currentPlaySize!=0){
             *percent=(currentPlayPosition*100)/currentPlaySize;
         }
@@ -111,7 +109,7 @@ void FORMAT_HELPER_getPlayTimeByExtension(uint8_t* currentPlaySecond,uint16_t* c
                 *allPlaySecond=((8*(currentPlaySize-currentPlayOffset)/currentPlayBitrate)/1000)%60;
             }
         }
-    }else if(strncasecmp(&fileName[length-3],"ogg",3)==0){
+    }else if(fileFormat==FORMAT_HELPER_FILE_TYPE_OGG){
         if(currentPlaySize!=0){
             *percent=(currentPlayPosition*100)/currentPlaySize;
         }
@@ -142,6 +140,23 @@ void FORMAT_HELPER_getPlayTimeByExtension(uint8_t* currentPlaySecond,uint16_t* c
     }
 }
 
+uint8_t FORMAT_HELPER_getFileType(char* fileName){
+    uint16_t length=strlen(fileName);
+    if(length<3){
+        return FORMAT_HELPER_FILE_TYPE_UNKNOWN;
+    }
+    if(strncasecmp(&fileName[length-3],"mp3",3)==0){
+        return FORMAT_HELPER_FILE_TYPE_MP3;
+    }else if((strncasecmp(&fileName[length-3],"mp4",3)==0)||(strncasecmp(&fileName[length-3],"m4a",3)==0)||(strncasecmp(&fileName[length-3],"aac",3)==0)||(strncasecmp(&fileName[length-3],"m4b",3)==0)){
+        return FORMAT_HELPER_FILE_TYPE_M4A;
+    }else if((strncasecmp(&fileName[length-3],"awb",3)==0)||(strncasecmp(&fileName[length-3],"amr",3)==0)){
+        return FORMAT_HELPER_FILE_TYPE_AMR;
+    }else if(strncasecmp(&fileName[length-3],"ogg",3)==0){
+        return FORMAT_HELPER_FILE_TYPE_OGG;
+    }
+    return FORMAT_HELPER_FILE_TYPE_UNKNOWN;
+}
+
 //from: http://www.mpgedit.org/mpgedit/mpeg_format/mpeghdr.htm
 uint16_t SD_PLAY_mp3BitratesV1[16]={0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0};
 uint32_t SD_PLAY_mp3SampleRatesV1[4]={8*441,8*480,8*320,8*0};
@@ -162,7 +177,7 @@ uint8_t SD_PLAY_mp3Channels[4]={2,2,2,1};
   * 
   * @return 0=ok, 1=error
   */
-uint8_t FORMAT_HELPER_getMP3FormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint32_t* bitrate,uint64_t* blockSize,uint64_t fileSize){
+uint8_t FORMAT_HELPER_getMP3FormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint64_t* bitrate,uint64_t* blockSize,uint64_t fileSize){
     char buf[16];
     uint8_t ret=1;
     uint8_t pad=0;
@@ -224,7 +239,7 @@ uint8_t FORMAT_HELPER_getMP3FormatInformation(FILE* file,int32_t* sampleRate, in
   * 
   * @return 0=ok, 1=error
   */
-uint8_t FORMAT_HELPER_getOGGFormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint32_t* bitrate,uint64_t* blockSize,uint64_t fileSize){
+uint8_t FORMAT_HELPER_getOGGFormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint64_t* bitrate,uint64_t* blockSize,uint64_t fileSize){
     char buf[60];
     uint8_t ret=1;
     fseek(file,0,SEEK_SET);
@@ -272,7 +287,7 @@ uint16_t SD_PLAY_amrWBitrates[16]={6600,8850,12650,14250,15850,18250,19850,23050
   * 
   * @return 0=ok, 1=error
   */
- uint8_t FORMAT_HELPER_getAMRFormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint32_t* bitrate,uint64_t* blockSize,uint64_t fileSize,bool* upMix){
+ uint8_t FORMAT_HELPER_getAMRFormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint64_t* bitrate,uint64_t* blockSize,uint64_t fileSize,bool* upMix){
     char buf[16];
     uint8_t ret=1;
     fseek(file,0,SEEK_SET);
@@ -283,7 +298,8 @@ uint16_t SD_PLAY_amrWBitrates[16]={6600,8850,12650,14250,15850,18250,19850,23050
             *upMix=true;
             *sampleRate=16000;
             *bits=16;//esp decoder always delivers 16bit
-            *bitrate=SD_PLAY_amrWBitrates[(buf[10]>>3)&0x0F];
+            *bitrate=SD_PLAY_amrWBitrates[(buf[9]>>3)&0x0F];
+            *blockSize=(*bitrate/(50*8))+2;
             *offset=9;
             ret=0;
         }else if(strncmp(&buf[0],"#!AMR\n",6)==0){
@@ -291,7 +307,8 @@ uint16_t SD_PLAY_amrWBitrates[16]={6600,8850,12650,14250,15850,18250,19850,23050
             *upMix=true;
             *sampleRate=8000;
             *bits=16;//esp decoder always delivers 16bit
-            *bitrate=SD_PLAY_amrNBitrates[(buf[7]>>3)&0x0F];
+            *bitrate=SD_PLAY_amrNBitrates[(buf[6]>>3)&0x0F];
+            *blockSize=(*bitrate/(50*8))+2;
             *offset=6;
             ret=0;
         }
@@ -315,7 +332,7 @@ uint16_t SD_PLAY_amrWBitrates[16]={6600,8850,12650,14250,15850,18250,19850,23050
   * 
   * @return 0=ok, 1=error
   */
-uint8_t FORMAT_HELPER_getM4AFormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint32_t* bitrate,uint64_t* blockSize,uint64_t fileSize){
+uint8_t FORMAT_HELPER_getM4AFormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint64_t* bitrate,uint64_t* blockSize,uint64_t fileSize){
     return 1;
 }
 

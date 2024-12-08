@@ -38,7 +38,7 @@ typedef struct {
     uint64_t filePos;
     uint64_t offset;
     uint64_t blockSize;
-    uint32_t bitrate;
+    uint64_t bitrate;
     uint64_t fileSize;
     int32_t channels;
 } SD_PLAY_message_t;

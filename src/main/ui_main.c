@@ -30,6 +30,7 @@
 #include "battery.h"
 #include "soc/rtc.h"
 #include "esp32s3/rom/rtc.h"
+#include <sys/stat.h>
 
 int64_t UI_MAIN_volume=5000;
 #define UI_MAIN_LOG_TAG "UI_MAIN"
@@ -501,6 +502,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                 currentPlaySpeed=100;
                                 currentEqualizer=0;
                                 currentRepeatMode=0;
+                                currentPlayPosition=0;
                                 mainSM=UI_MAIN_RUN_SM_PAUSED;
                                 if(searchId>=0){//did we search for a filename that was last listened and found one?
                                     strcpy(&UI_MAIN_selectedFileName[0],&UI_MAIN_saveState.fileName[0]);
@@ -519,9 +521,38 @@ char UI_MAIN_pcWriteBuffer[2048];
                                     currentEqualizer=UI_MAIN_saveState.equalizer;
                                     currentRepeatMode=UI_MAIN_saveState.repeatMode;
                                     currentPlayPosition=FORMAT_HELPER_getFilePosByPlayTimeAndExtension(currentPlaySecond,currentPlayMinute,&UI_MAIN_selectedFileName[0],currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,currentPlayChannels);
+                                }else{//never played the the current track, get inital file information to be able to seek
+                                    if(FF_getNameByID(&UI_MAIN_folderPath[0],UI_MAIN_sortedFileIDs[selectedFile-1],&UI_MAIN_selectedFileName[0],1)==0){
+                                        strcpy(&UI_MAIN_filePath[0],&UI_MAIN_folderPath[0]);
+                                        strcat(&UI_MAIN_filePath[0],"/");
+                                        strcat(&UI_MAIN_filePath[0],&UI_MAIN_selectedFileName[0]);
+
+                                        uint8_t fileFormat=FORMAT_HELPER_getFileType(&UI_MAIN_filePath[0]);
+                                        struct stat st;
+                                        if(stat(UI_MAIN_filePath, &st)==0){
+                                            int32_t sampleRate=0,bits=0,channels=0;
+                                            bool upmix;
+                                            FILE *fileHandle=NULL;
+                                            fileHandle = fopen(UI_MAIN_filePath,"r");
+                                            
+                                            if(fileFormat==FORMAT_HELPER_FILE_TYPE_AMR){
+                                                FORMAT_HELPER_getAMRFormatInformation(fileHandle,&sampleRate,&bits,&channels,&currentPlayOffset,&currentPlayBitrate,&currentPlayBlockSize,st.st_size,&upmix);
+                                            }else if(fileFormat==FORMAT_HELPER_FILE_TYPE_MP3){
+                                                FORMAT_HELPER_getMP3FormatInformation(fileHandle,&sampleRate,&bits,&channels,&currentPlayOffset,&currentPlayBitrate,&currentPlayBlockSize,st.st_size);
+                                            }else if(fileFormat==FORMAT_HELPER_FILE_TYPE_OGG){
+                                                FORMAT_HELPER_getOGGFormatInformation(fileHandle,&sampleRate,&bits,&channels,&currentPlayOffset,&currentPlayBitrate,&currentPlayBlockSize,st.st_size);
+                                            }
+                                            currentPlaySize=st.st_size;
+                                            currentPlayChannels=channels;
+                                            if(fileHandle!=NULL){
+                                                fclose(fileHandle);
+                                            }
+                                        }
+                                    }
                                 }
                                 if(UI_MAIN_amountOfFiles==1){
                                     pauseMode=1;//no need for chapter selection if only one track exists
+                                    newPlayMinute=currentPlayMinute;//but make sure the blinking adjustable position value is the same as the current position
                                 }
                                 SD_PLAY_setEqualizer(currentEqualizer);
                                 UI_MAIN_screenOnIfNeeded();
