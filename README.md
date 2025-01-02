@@ -11,7 +11,7 @@ This is a device that is meant to play non-DRM audio books from SD cards and has
 - file formats AMR-WB, MP3 and OGG
 - ASCII character based menu driven UI for 16x4 character screen
 - single rotary encoder navigation
-- sleep timer 1...99min, wakeup timer 1min...24hr
+- sleep timer 1...480min, wakeup timer 1min...24hr
 - play speed settings from 0.5...2.5 in 0.05 steps (saved individually for each audio book)
 - audio equalizer (saved individually for each audio book)
 - endless auto repeat mode of selected audio book
@@ -97,7 +97,7 @@ Typical price in Germany incl. tax (2023): 8€.
 I still had old big SD cards laying around so I started with a big SD card holder. They also exists in
 micro sd card format. I used this model as it comes with the needed pullup resistors already on the PCB.
 Additionally I removed the voltage regulator that is used to convert 5V to 3.3V as I drive the board already
-with 3.3V and it consumed around 2mA if back fed. I tested SD cards up to 256GB with this board and they worked.  
+with 3.3V and it consumed around 2mA if back fed. I tested SD cards up to 512GB with this board and they worked.  
 ![image](pictures/sd_card_holder.jpg)  
 Typical price in Germany incl. tax (2023): 1.5€. 
   
@@ -409,12 +409,13 @@ The progress bar at the bottom shows the progress of the scan an sorting process
 |audio book name |
 | |------------| |
 | |     12/121 | |
-| |----00:01---| |
+| |*---00:01---| |
  ----------------
 ```
 Using rotation the different audio books can be selected. The screen shows selected 12 of 121 audio books.
 The audio book name at the top is the name of the folder and scrolls through the screen if it is long.  
 The value 00:01 is only shown if the wake up timer has been setup and activated and shows the setup value.  
+If an ```!``` is shown it means a bookmark exists for this book. If an ```*``` is shown the bookmark is at a position >95% of the last track of this book.  
   
 ### Audio book content scan screen
 ```
@@ -686,18 +687,17 @@ afterwards started again the old version should be activated again.
   
 # Compilation hints
 Currently used espressif sdk versions:  
-esp-idf:  v5.1.1/commit e088c3766ba440e72268b458a68f27b6e7d63986  
-esp-adf:  v2.6/commit 49f80aafefc31642ea98db78bf024e18688b8de9  
+esp-idf:  v5.3.2/commit 9d7f2d69f50d1288526d4f1027108e314e8c879f  
+esp-adf:  v2.7/commit 9cf556de500019bb79f3bb84c821fda37668c052  
   
 Needed for exFAT:   
-To enable exFAT file esp-idf/components/fatfs/src/ffconf.h needs to edited and macro FF_FS_EXFAT needs to be set 1.  
+To enable exFAT file esp-idf/components/fatfs/src/ffconf.h needs to be adjusted.  
   
 Optionally for more privacy:  
-The esp-adf unnecessarily links the nghttp component which on every compilation checks with the servers for updates.
-To disable delete file idf_components.yml in components/esp-adf-libs/ and change the COMPONENT_REQUIRES in CMakeLists.txt
-so that no nghttp is present anymore. Now complete offline compilation is possible.  
+The esp-adf unnecessarily links components which on every compilation results in checks with the servers for updates by the component manager.  
+To be able to compile completely offline adjustments to the sdk source trees were made.
   
-Take a look into the `src/patches/` directory for more details and .patch files to apply to above sdk versions.
+Take a look into the `src/patches/` directory for the .patch files to apply to above sdk versions.
   
 # Software architecture
   

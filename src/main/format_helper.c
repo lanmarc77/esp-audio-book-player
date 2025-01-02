@@ -182,6 +182,7 @@ uint8_t FORMAT_HELPER_getMP3FormatInformation(FILE* file,int32_t* sampleRate, in
     uint8_t ret=1;
     uint8_t pad=0;
     uint8_t readFrames=2;//read two mpeg frames to jump over a possible info frame that might have wrong stream information
+    uint8_t samplesPerFrame=144;
     fseek(file,0,SEEK_SET);
     int64_t read=fread(&buf[0],1,sizeof(buf),file);
     if(read == sizeof(buf)){//id3v2 tag + full header?
@@ -193,8 +194,8 @@ uint8_t FORMAT_HELPER_getMP3FormatInformation(FILE* file,int32_t* sampleRate, in
             *offset=0;
         }
         while(readFrames--){
-            if((buf[0]==0xFF)&&((buf[1]&0xF0)==0xF0)){
-                //if we are here we should see the first data frame
+            if((buf[0]==0xFF)&&((buf[1]&0xF0)==0xF0)){//because we use 0xF0 here we ignore/filter out MPEG2.5
+                //if we are here we should be at a data frame start
                 *bits=16;//esp decoder always delivers 16bit
                 *channels=SD_PLAY_mp3Channels[(buf[3]>>6)&0x03];
                 if(buf[2]&0x02){
@@ -203,21 +204,32 @@ uint8_t FORMAT_HELPER_getMP3FormatInformation(FILE* file,int32_t* sampleRate, in
                     pad=0;
                 }
                 if(((buf[1]>>3)&0x03)==0x03){//MPEG1
+                    samplesPerFrame=144;
                     //ESP_LOGI("MP3","V1 Layer 3 %x %x %x %llu",buf[1], buf[2], buf[3],*offset);
                     *sampleRate=((SD_PLAY_mp3SampleRatesV1[(buf[2]>>2)&0x03])/8)*100;
                     *bitrate=SD_PLAY_mp3BitratesV1[(buf[2]>>4)];
-                    *blockSize=1+(10L*(*bitrate)* 1152L) / SD_PLAY_mp3SampleRatesV1[(buf[2]>>2)&0x03];
-                }else{//MPEG2 or 2.5
+                    if((*sampleRate!=0)&&(*bitrate!=0)){//avoid division by 0 if frame was wrongfully detected
+                        *blockSize=1+(10L*(*bitrate)* 1152L) / SD_PLAY_mp3SampleRatesV1[(buf[2]>>2)&0x03];
+                    }
+                }else{//MPEG2
+                    samplesPerFrame=72;
+                    //ESP_LOGI("MP3","V2 Layer 3 %x %x %x %llu",buf[1], buf[2], buf[3],*offset);
                     *sampleRate=SD_PLAY_mp3SampleRatesV2[(buf[2]>>2)&0x03];
                     *bitrate=SD_PLAY_mp3BitratesV2[(buf[2]>>4)];
-                    *blockSize=1+((10L*(*bitrate)* 1152L) / SD_PLAY_mp3SampleRatesV2[(buf[2]>>2)&0x03])/8;
+                    if((*sampleRate!=0)&&(*bitrate!=0)){//avoid division by 0 if frame was wrongfully detected
+                        *blockSize=1+((10L*(*bitrate)* 576L) / SD_PLAY_mp3SampleRatesV2[(buf[2]>>2)&0x03])/8;
+                    }
                 }
-                //next frame
-                *offset+=((144* (*bitrate*1000)) / *sampleRate)+pad;
-                //ESP_LOGI("MP3","New offset %llu",*offset);
-                fseek(file,*offset,SEEK_SET);
-                read=fread(&buf[0],1,sizeof(buf),file);
-                ret=0;
+                if((*sampleRate!=0)&&(*bitrate!=0)){//avoid division by 0 if frame was wrongfully detected
+                    //next frame
+                    *offset+=((samplesPerFrame* (*bitrate*1000)) / *sampleRate)+pad;
+                    //ESP_LOGI("MP3","New offset %llu",*offset);
+                    fseek(file,*offset,SEEK_SET);
+                    read=fread(&buf[0],1,sizeof(buf),file);
+                    ret=0;
+                }else{
+                    ret=1;
+                }
             }
         }
     }
@@ -333,6 +345,12 @@ uint16_t SD_PLAY_amrWBitrates[16]={6600,8850,12650,14250,15850,18250,19850,23050
   * @return 0=ok, 1=error
   */
 uint8_t FORMAT_HELPER_getM4AFormatInformation(FILE* file,int32_t* sampleRate, int32_t* bits, int32_t* channels,uint64_t* offset,uint64_t* bitrate,uint64_t* blockSize,uint64_t fileSize){
+    *sampleRate=44100;
+    *bits=16;
+    *channels=2;
+    *offset=0;
+    *bitrate=128*1024;
+    *blockSize=64;
     return 1;
 }
 

@@ -41,6 +41,7 @@ static bool BATTERY_adc_calibration_init(adc_unit_t unit, adc_channel_t channel,
         ESP_LOGI(BATTERY_LOG_TAG, "calibration scheme version is %s", "Curve Fitting");
         adc_cali_curve_fitting_config_t cali_config = {
             .unit_id = unit,
+            .chan = channel,
             .atten = atten,
             .bitwidth = ADC_BITWIDTH_DEFAULT,
         };
@@ -99,11 +100,11 @@ void BATTERY_battVoltageTask(){
 
     adc_oneshot_chan_cfg_t config = {
         .bitwidth = ADC_BITWIDTH_DEFAULT,
-        .atten = ADC_ATTEN_DB_11,
+        .atten = ADC_ATTEN_DB_12,
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_0, &config));
     adc_cali_handle_t adc1_cali_chan0_handle = NULL;
-    cali_enable = BATTERY_adc_calibration_init(ADC_UNIT_1, ADC_CHANNEL_0, ADC_ATTEN_DB_11, &adc1_cali_chan0_handle);
+    cali_enable = BATTERY_adc_calibration_init(ADC_UNIT_1, ADC_CHANNEL_0, ADC_ATTEN_DB_12, &adc1_cali_chan0_handle);
 
     while(1){
         ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CHANNEL_0, &BATTERY_adc_raw[0][0]));
