@@ -59,6 +59,8 @@ void SSD1306_init(){
     ssd1306_clear_screen(SSD1306_dev, 0x00);
 }
 
+uint8_t UI_ELEMENTS_disablePosition=16*4;
+
 void SSD1306_cls(){
     ssd1306_clear_screen(SSD1306_dev, 0x00);
     ssd1306_refresh_gram(SSD1306_dev);
@@ -66,7 +68,35 @@ void SSD1306_cls(){
 
 void SSD1306_printStr(uint8_t x,uint8_t y, char* string){
     uint16_t i=0;
-    if(UI_ELEMENTS_displayDark==false) for(i=0;string[i]!=0;i++) ssd1306_draw_char(SSD1306_dev, (x+i)*8,y*16, string[i],16,1);
+    if(UI_ELEMENTS_displayDark==false){
+        for(i=0;string[i]!=0;i++){
+            if(UI_ELEMENTS_disablePosition>(x+i)+y*16)
+                ssd1306_draw_char(SSD1306_dev, (x+i)*8,y*16, string[i],16,1);
+        }
+    }
+}
+
+/**
+  * @brief simply prints a string to the given screen position
+  *
+  * @param x x position 
+  * @param y y position
+  * @param string pointer to a string
+  * 
+  */
+void UI_ELEMENTS_printStr(uint8_t x,uint8_t y, char* string){
+    SSD1306_printStr(x,y,string);
+}
+
+/**
+  * @brief disables showing charactes starting with a specific position on the screen
+  *
+  * @param startPos 0 (all is displayed)...16*4 (dnothing is displayed)
+  * 
+  */
+void UI_ELEMENTS_disableChars(uint8_t startPos){
+    if(startPos>16*4) startPos=16*4;
+    UI_ELEMENTS_disablePosition=(16*4)-startPos;
 }
 
 /**
@@ -568,6 +598,7 @@ void UI_ELEMENTS_cls(){
   */
 void UI_ELEMENTS_displayOn(){
     UI_ELEMENTS_displayDark=false;
+    UI_ELEMENTS_disableChars(0);
 }
 
 /**

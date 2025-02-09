@@ -21,7 +21,7 @@
 
 void SCREENS_noSdCard();
 void SCREENS_noFolders();
-void SCREENS_folderSelect(uint16_t selectedFolder,uint16_t amountOfFolders,char* folderName,uint64_t secondsTime);
+void SCREENS_folderSelect(uint16_t selectedFolder,uint16_t amountOfFolders,char* folderName,uint64_t secondsTime, uint8_t extraFlags);
 void SCREENS_scanAllBooks(int32_t deciPercent);
 void SCREENS_scanOneBook(int32_t deciPercent);
 void SCREENS_pause0(uint16_t selectedFile,uint16_t amountOfFiles,char* folderName,uint16_t currentPlayMinute,uint8_t currentPlaySecond,uint8_t percent,uint32_t batt,uint32_t sleepTimeSecondsLeft);

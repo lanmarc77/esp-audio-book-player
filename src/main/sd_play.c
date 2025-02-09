@@ -373,7 +373,11 @@ int SD_PLAY_mp3ReadCb(audio_element_handle_t el, char *buf, int len, TickType_t 
         default:    if((SD_PLAY_desiredFilePos>0)&&(SD_PLAY_codecSyned)) {
                         fseek(SD_PLAY_currentPlayfile,SD_PLAY_desiredFilePos,SEEK_SET);
                         SD_PLAY_desiredFilePos=0;
-                        SD_PLAY_waitJump=1;
+                        if(info.sample_rates/1470>=30){
+                            SD_PLAY_waitJump=1;
+                        }else{
+                            SD_PLAY_waitJump=30-info.sample_rates/1470;
+                        }
                     }
                     readBytes=fread(buf,1,len,SD_PLAY_currentPlayfile);
                     break;
@@ -657,6 +661,8 @@ uint8_t SD_PLAY_startPlaying(char* file,uint64_t filePos){
             if(filePos>SD_PLAY_currentFileSize) filePos=0;
             aac_decoder_cfg_t aac_cfg = DEFAULT_AAC_DECODER_CONFIG();
             aac_cfg.task_core = 1;
+            //aac_cfg.task_stack = 10*1024;
+            //aac_cfg.out_rb_size = 10*1024;
             SD_PLAY_musicFormatDecoder= aac_decoder_init(&aac_cfg);
             audio_element_set_read_cb(SD_PLAY_musicFormatDecoder, SD_PLAY_m4aReadCb, NULL);
             if(FORMAT_HELPER_getM4AFormatInformation(SD_PLAY_currentPlayfile,&sampleRate,&bits,&channels,&SD_PLAY_offset,&SD_PLAY_bitrate,&SD_PLAY_blockSize,SD_PLAY_currentFileSize)==0){
@@ -792,7 +798,6 @@ void SD_PLAY_init(){
     SD_PLAY_HW_MUTE();
     i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
     i2s_cfg.type = AUDIO_STREAM_WRITER;
-    i2s_cfg.i2s_config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
     SD_PLAY_i2sStreamWriter = i2s_stream_init(&i2s_cfg);
 }
 
@@ -807,7 +812,6 @@ uint8_t SD_PLAY_startService(){
     if(SD_PLAY_i2sStreamWriter==NULL){
         i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
         i2s_cfg.type = AUDIO_STREAM_WRITER;
-        i2s_cfg.i2s_config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
         SD_PLAY_i2sStreamWriter = i2s_stream_init(&i2s_cfg);
     }
 

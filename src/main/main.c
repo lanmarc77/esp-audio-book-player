@@ -127,7 +127,9 @@ void app_main(void)
         ESP_LOGI(MAIN_LOG_TAG,"Wakeup by button press");
         startUpFlags|=UI_MAIN_STARTUPFLAG_MANUAL;
     }
-
+    if(UI_MAIN_isImagePersisted()){
+        startUpFlags|=UI_MAIN_STARTUPFLAG_IMAGE_PERSISTED;
+    }
     UI_MAIN_run(startUpFlags);
 
     UI_MAIN_deInit();

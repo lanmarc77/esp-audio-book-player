@@ -46,13 +46,19 @@ void SCREENS_noFolders(){
   * @param amountOfFolder the amount of audio book folders
   * @param folderName pointer to the name of the selected audio book folder
   * @param secondsTime the wakeup time in seconds, needs to be >0 to be displayed
+  * @param extraFlags bit oriented: 0=bookmark exists, 1=finished flag set
   * 
   */
-void SCREENS_folderSelect(uint16_t selectedFolder,uint16_t amountOfFolders,char* folderName,uint64_t secondsTime){
+void SCREENS_folderSelect(uint16_t selectedFolder,uint16_t amountOfFolders,char* folderName,uint64_t secondsTime, uint8_t extraFlags){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(6);
     UI_ELEMENTS_numberSelect(3,2,selectedFolder,amountOfFolders,1);
     UI_ELEMENTS_textScrolly(2,0,12,folderName);
+    if(extraFlags&2){
+      UI_ELEMENTS_printStr(2,3,"*");
+    }else if(extraFlags&1){
+      UI_ELEMENTS_printStr(2,3,"!");
+    }
     if(secondsTime>0) UI_ELEMENTS_timeSelect(6,3,secondsTime,0);
     UI_ELEMENTS_update();
 }
@@ -275,7 +281,7 @@ void SCREENS_startUp(uint8_t imageFlags){
     UI_ELEMENTS_cls();
     UI_ELEMENTS_mainSymbol(9);
     //sprintf(&b[0],"TINAMP");UI_ELEMENTS_textScrolly(4,0,6,&b[0]);
-    if(imageFlags&8){
+    if(imageFlags&UI_MAIN_STARTUPFLAG_IMAGE_PERSISTED){
         sprintf(&b[0],"ok");
         UI_ELEMENTS_textScrolly(7,2,2,&b[0]);
     }else{

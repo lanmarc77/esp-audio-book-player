@@ -38,6 +38,7 @@ typedef struct{
     uint16_t playSpeed;
     uint16_t equalizer;
     uint8_t repeatMode;
+    uint8_t finished;
 }SAVES_saveState_t;
 
 

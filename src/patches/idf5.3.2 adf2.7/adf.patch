@@ -1,0 +1,76 @@
+diff --git a/components/adf_utils/CMakeLists.txt b/components/adf_utils/CMakeLists.txt
+index 42f8ff64..5c6fc640 100644
+--- a/components/adf_utils/CMakeLists.txt
++++ b/components/adf_utils/CMakeLists.txt
+@@ -1,9 +1,9 @@
+ set(COMPONENT_ADD_INCLUDEDIRS cloud_services/include include)
+ 
+ # Edit following two lines to set component requirements (see docs)
+-set(COMPONENT_PRIV_REQUIRES esp_http_client jsmn mbedtls audio_sal)
++set(COMPONENT_PRIV_REQUIRES esp_http_client mbedtls audio_sal)
+ 
+-set(COMPONENT_SRCS ./json_utils.c cloud_services/aws_sig_v4_signing.c cloud_services/baidu_access_token.c)
++set(COMPONENT_SRCS cloud_services/aws_sig_v4_signing.c cloud_services/baidu_access_token.c)
+ 
+ register_component()
+ 
+diff --git a/components/adf_utils/idf_component.yml b/components/adf_utils/idf_component.yml
+deleted file mode 100644
+index 7ada041e..00000000
+--- a/components/adf_utils/idf_component.yml
++++ /dev/null
+@@ -1,5 +0,0 @@
+-dependencies:
+-  espressif/jsmn:
+-    version: "^1.1.0"
+-    rules:
+-      - if: "idf_version >=5.0"
+diff --git a/components/audio_recorder/CMakeLists.txt b/components/audio_recorder/CMakeLists.txt
+index 9d298474..318c3250 100644
+--- a/components/audio_recorder/CMakeLists.txt
++++ b/components/audio_recorder/CMakeLists.txt
+@@ -6,10 +6,10 @@ set(COMPONENT_SRCS "recorder_encoder.c" "audio_recorder.c")
+ 
+ set(COMPONENT_REQUIRES audio_sal audio_pipeline)
+ 
+-if((${IDF_TARGET} STREQUAL "esp32") OR (${IDF_TARGET} STREQUAL "esp32s3") OR (${IDF_TARGET} STREQUAL "esp32p4"))
+-    list(APPEND COMPONENT_SRCS "recorder_sr.c")
+-    list(APPEND COMPONENT_REQUIRES esp-sr)
+-endif()
++#if((${IDF_TARGET} STREQUAL "esp32") OR (${IDF_TARGET} STREQUAL "esp32s3") OR (${IDF_TARGET} STREQUAL "esp32p4"))
++#    list(APPEND COMPONENT_SRCS "recorder_sr.c")
++#    list(APPEND COMPONENT_REQUIRES esp-sr)
++#endif()
+ 
+ if (idf_version VERSION_GREATER_EQUAL "5.0")
+ list(APPEND COMPONENT_REQUIRES esp_timer)
+diff --git a/components/audio_stream/CMakeLists.txt b/components/audio_stream/CMakeLists.txt
+index a65eaa89..2a9e1504 100644
+--- a/components/audio_stream/CMakeLists.txt
++++ b/components/audio_stream/CMakeLists.txt
+@@ -26,9 +26,9 @@ list(APPEND COMPONENT_SRCS  "lib/gzip/gzip_miniz.c")
+ 
+ set(COMPONENT_REQUIRES audio_pipeline driver audio_sal esp_http_client tcp_transport spiffs audio_board esp-adf-libs bootloader_support esp_dispatcher esp_actions tone_partition mbedtls)
+ 
+-if((${IDF_TARGET} STREQUAL "esp32") OR (${IDF_TARGET} STREQUAL "esp32s3") OR (${IDF_TARGET} STREQUAL "esp32p4"))
+-    list(APPEND COMPONENT_SRCS "algorithm_stream.c" "tts_stream.c")
+-    list(APPEND COMPONENT_REQUIRES esp-sr)
+-endif()
++#if((${IDF_TARGET} STREQUAL "esp32") OR (${IDF_TARGET} STREQUAL "esp32s3") OR (${IDF_TARGET} STREQUAL "esp32p4"))
++#    list(APPEND COMPONENT_SRCS "algorithm_stream.c" "tts_stream.c")
++#    list(APPEND COMPONENT_REQUIRES esp-sr)
++#endif()
+ 
+ register_component()
+diff --git a/components/esp-adf-libs b/components/esp-adf-libs
+--- a/components/esp-adf-libs
++++ b/components/esp-adf-libs
+@@ -1 +1 @@
+-Subproject commit f1b8cdbf9986402fbd9a743704eb699a3521900a
++Subproject commit f1b8cdbf9986402fbd9a743704eb699a3521900a-dirty
+diff --git a/components/esp-sr b/components/esp-sr
+--- a/components/esp-sr
++++ b/components/esp-sr
+@@ -1 +1 @@
+-Subproject commit 394aae67b578cf45ed13dad9c2e0c428f5d599f0
++Subproject commit 394aae67b578cf45ed13dad9c2e0c428f5d599f0-dirty
