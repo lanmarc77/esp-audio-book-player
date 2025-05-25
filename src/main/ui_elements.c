@@ -334,6 +334,31 @@ void UI_ELEMENTS_mainSymbol(uint8_t symbol){
         SSD1306_printStr(0,1,"\\\\\\\\\\\\   //////");
         SSD1306_printStr(0,2,"      xxx       ");
         SSD1306_printStr(0,3,"//////   \\\\\\\\\\\\");
+    }else if(symbol==22){//setup selection
+        SSD1306_printStr(0,0,"     *******    ");
+        SSD1306_printStr(0,1,"   /  Setup  \\  ");
+        SSD1306_printStr(0,2,"   \\         /  ");
+        SSD1306_printStr(0,3,"     *******    ");
+    }else if(symbol==23){//setup image persisted
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1,"    firmware    ");
+        SSD1306_printStr(0,2,"    persisted   ");
+        SSD1306_printStr(0,3,"       OK       ");
+    }else if(symbol==24){//setup image in TEST mode
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1,"     persist    ");
+        SSD1306_printStr(0,2,"     firmware   ");
+        SSD1306_printStr(0,3,"        ?       ");
+    }else if(symbol==25){//setup full functions
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1,"       all      ");
+        SSD1306_printStr(0,2,"    functions   ");
+        SSD1306_printStr(0,3,"                ");
+    }else if(symbol==26){//setup reduced functions
+        SSD1306_printStr(0,0,"                ");
+        SSD1306_printStr(0,1,"     reduced    ");
+        SSD1306_printStr(0,2,"     functions  ");
+        SSD1306_printStr(0,3,"                ");
     }
 }
 

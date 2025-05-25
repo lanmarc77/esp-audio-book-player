@@ -51,6 +51,7 @@ typedef struct{
     uint8_t rotaryEncoderSpeed;
     uint8_t rotaryEncoderDirection;
     uint8_t brightness;
+    uint8_t reducedMode;
 }SAVES_settings_t;
 
 

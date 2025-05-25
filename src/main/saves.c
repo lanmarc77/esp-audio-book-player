@@ -102,7 +102,9 @@ uint8_t SAVES_loadSettings(SAVES_settings_t *settings){
         return 1;
     }
     int32_t result=fread(settings,1,sizeof(SAVES_settings_t),f);
-    if(result>=sizeof(SAVES_settings_t)){
+    if ((result<sizeof(SAVES_settings_t)&&(feof(f)))
+        ||(result==sizeof(SAVES_settings_t)))
+    {
         fclose(f);
         return 0;
     }else{
