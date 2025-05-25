@@ -487,4 +487,65 @@ void SCREENS_bookmarkDeletionSetup(int32_t numberOfFiles,uint8_t blinkMode){
     }
 }
 
+/**
+  * @brief shows the screen for selecting the setup
+  * 
+  */
+void SCREENS_setupSelect(){
+    UI_ELEMENTS_cls();
+    UI_ELEMENTS_mainSymbol(22);
+    UI_ELEMENTS_update();
+}
+
+/**
+  * @brief shows the setup screen for enabling/disabling reduced mode
+  *
+  * @param reducedMode mode of reduction, 0=no reduction
+  * @param blinkMode 1=numbers blink, 0=no blinking
+  * 
+  */
+void SCREENS_reducedModeSetup(uint8_t reducedMode,uint8_t blinkMode){
+    uint64_t now=esp_timer_get_time();
+    UI_ELEMENTS_cls();
+	if(reducedMode){
+		UI_ELEMENTS_mainSymbol(26);
+	}else{
+		UI_ELEMENTS_mainSymbol(25);
+	}
+    if(blinkMode==0){
+
+	}else{
+        if(((now/1000)%1000)<100){
+			UI_ELEMENTS_cls();
+        }
+        UI_ELEMENTS_update();
+    }
+}
+
+/**
+  * @brief shows the setup screen for persisting firmware
+  *
+  * @param fwPersisted 0=fw is in test mode, 1=fw is already persisted
+  * @param blinkMode 1=numbers blink, 0=no blinking
+  * 
+  */
+void SCREENS_fwAcceptSetup(uint8_t fwPersisted,uint8_t blinkMode){
+    uint64_t now=esp_timer_get_time();
+    char b[10];
+    UI_ELEMENTS_cls();
+	if(fwPersisted){
+		UI_ELEMENTS_mainSymbol(23);
+	}else{
+		UI_ELEMENTS_mainSymbol(24);
+	}
+    if(blinkMode==0){
+    }else{
+        if(((now/1000)%1000)<100){
+			sprintf(&b[0]," ");
+			UI_ELEMENTS_textScrolly(8,3,2,&b[0]);
+        }
+		UI_ELEMENTS_update();
+    }
+}
+
 #endif

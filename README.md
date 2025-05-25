@@ -198,7 +198,7 @@ The only input device is a rotary encoder with a button. They are usually used a
 ## The players state machine
 Legend:  
 SC=short click  
-LC=long click  
+LC=long click (or wait 10s in reduced functions mode)  
 DC=double click  
 AC=any type of click  
   
@@ -244,7 +244,7 @@ AC=any type of click
                 v                    LC                                  3s
    ---> audio book selection screen ----> persist new fw ---> off screen ---> power off
   |     |     |       ^    ^      ^         if needed
-  |     | DC  |SC     |    |      |
+  |     |     |SC     |    |      |
   |     |     |       |    |      |
   |     |     |       |    |      |
   |     |     |       |    |      |
@@ -271,8 +271,8 @@ AC=any type of click
   |     |                                  -------> chapter
   |     |
   |     |
-  |     |
-  |     |
+  |     | select audio book "0"
+  |     |  named setup screen
   |      -----------------
   |                       |          next settings
   |      LC               v             screen
@@ -528,33 +528,54 @@ On the right side the battery level in percent is shown.
 Also shows the size of the detected SD card, the number of stored bookmarks and the used space of the bookmark storage in the SPIFFS of the ESP32.  
   
 ### Global settings/functionality
+The setup is entered by scrolling to audio book "0". The following screen is displayed:  
+```
+ ---------------- 
+|     *******    |
+|   /  Setup  \  |
+|   \         /  |
+|     *******    |
+ ----------------
+```
+Setup is entered with a single click and left with a long click.  
+It has the following internal layout:  
 ```
    wakeup timer         screen rotation
- ----------------      ----------------  
-|       1/6      |    |       2/6      |
+ ----------------      ----------------
+|       1/8      |    |       2/8      |
 |(-_-)  ->  (o_o)| -> |   -------->    |
 |                |    |  |    0    |   |
 |      01:00     |    |   <--------    |
  ----------------      ----------------
         ^                     |
         |                     v
-     bookmark          screen brightness
-     deletion              settings
- ----------------      ----------------  
-|       6/6      |    |       3/6      |
-|   Bookmarks    |    |\\\\\\    //////|
-|    10 -> 0     |    |       100      |
-|       ?        |    |//////    \\\\\\|
+     firmware           screen brightness
+     persist               settings
+ ----------------      ----------------
+|       8/8      |    |       3/8      |
+|     persist    |    |\\\\\\    //////|
+|     firmware   |    |       100      |
+|        ?       |    |//////    \\\\\\|
  ----------------      ----------------
         ^                     |
         |                     v
-  rotary encoder         rotary encoder
-      speed                direction
- ----------------      ----------------  
-|       5/6      |    |       4/6      |
-| o o            | <- | o o            |
-|o   o     x1    |    |o   o    -->+   |
-| o o            |    | o o            |
+     reduced           rotary encoder
+      mode                direction
+ ----------------      ----------------
+|       7/8      |    |       4/8      |
+|       all      |    | o o            |
+|    functions   |    |o   o    -->+   |
+|                |    | o o            |
+ ----------------      ----------------
+        ^                     |
+        |                     v
+     bookmark           rotary encoder
+     deletion               speed
+ ----------------      ----------------
+|       6/8      |    |       5/8      |
+|   Bookmarks    | <- | o o            |
+|    10 -> 0     |    |o   o     x1    |
+|       ?        |    | o o            |
  ----------------      ----------------
 ```
 After entering the global settings the rotary knob can be used to select the setting to change.  
@@ -633,6 +654,31 @@ This setting is stored and reloaded on each player start.
  ----------------
 ```
 Shows the number of bookmarks that can be deleted using a short click without deleting other settings.  
+  
+#### Reduced functions mode
+```
+ ---------------- 
+|                |
+|       all      |
+|    functions   |
+|                |
+ ----------------
+```
+If reduced functions only the normal single click is an accepted rotary knob action. The long press (usually back) of the rotary knob is disabled and instead substituted by a 10s time delay. If 10s nothing is pressed the menu is automatically left.  
+Additionally the overlay only allows setting up volume with no further sub menus like play speed. Also no double click is accepted.  
+This mode is meant for elderly persons who might have difficulties with all the possibility and just want to select and audio book and listen to it.  
+  
+#### Firmware accept
+```
+ ---------------- 
+|                |
+|     persist    |
+|     firmware   |
+|        ?       |
+ ----------------
+```
+If the firmware was just upgraded the firmware can be kept with this menu point. If the firmware was persisted already it shows OK instead of a question mark.  
+If the firmware is not persisted after an upgrade and the player is shutdown the player will rollback the firmware to the previous one.  
   
 # Uploading initial binary release
 For a brand new main controller board an initial upload is needed. This initial upload will setup the correct partition details and installs the firmware for the first time. After this initial upload firmware upgrades via the SD card are possible.  

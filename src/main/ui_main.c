@@ -57,6 +57,7 @@ QueueHandle_t UI_MAIN_scanQueueIn=NULL;
 QueueSetHandle_t UI_MAIN_keysAndPlay=NULL;
 uint16_t UI_MAIN_amountOfBooks=0;
 uint16_t UI_MAIN_amountOfFiles=0;
+uint8_t reducedMode=1;
 uint16_t UI_MAIN_sortedBookIDs[FF_MAX_FOLDER_ELEMENTS];
 char UI_MAIN_selectedFolderName[FF_FILE_PATH_MAX];
 char UI_MAIN_selectedFileName[FF_FILE_PATH_MAX];
@@ -132,17 +133,25 @@ void UI_MAIN_rotaryTask(void *parm){
             }else if(rotaryEvent.state.direction == ROTARY_ENCODER_SWITCH){
                 //ESP_LOGI(UI_MAIN_LOG_TAG, "KEY SWITCH");
                 if(rotaryEvent.state.switch_state==ROTARY_ENCODER_SWITCH_SHORT_CLICK){
-                    keyMessage.keyEvent=UI_MAIN_KEY_SHORT_CLICK_DELAYED_STAGE;
-                    if(UI_MAIN_doubleClick){
-                        UI_MAIN_doubleClick=0;
-                        keyMessage.keyEvent=UI_MAIN_KEY_DOUBLE_CLICK;
-                        //ESP_LOGI(UI_MAIN_LOG_TAG,"DOUBLE CLICK");
+                    if(reducedMode){
+                        keyMessage.keyEvent=UI_MAIN_KEY_SHORT_CLICK;
                     }else{
-                        UI_MAIN_doubleClick=1;
+                        keyMessage.keyEvent=UI_MAIN_KEY_SHORT_CLICK_DELAYED_STAGE;
+                        if(UI_MAIN_doubleClick){
+                            UI_MAIN_doubleClick=0;
+                            keyMessage.keyEvent=UI_MAIN_KEY_DOUBLE_CLICK;
+                            //ESP_LOGI(UI_MAIN_LOG_TAG,"DOUBLE CLICK");
+                        }else{
+                            UI_MAIN_doubleClick=1;
+                        }
                     }
                 }else if(rotaryEvent.state.switch_state==ROTARY_ENCODER_SWITCH_LONG_CLICK){
-                    keyMessage.keyEvent=UI_MAIN_KEY_LONG_CLICK;
-                    UI_MAIN_doubleClick=0;
+                    if(reducedMode){
+                        keyMessage.keyEvent=UI_MAIN_KEY_SHORT_CLICK;
+                    }else{
+                        keyMessage.keyEvent=UI_MAIN_KEY_LONG_CLICK;
+                        UI_MAIN_doubleClick=0;
+                    }
                 }
             }
             UI_MAIN_offTimestamp=now;
@@ -159,37 +168,44 @@ void UI_MAIN_rotaryTask(void *parm){
                 UI_ELEMENTS_displayOn();
             }
         }else{
-            if(UI_MAIN_doubleClick>5){
-                keyMessage.keyEvent=UI_MAIN_KEY_SHORT_CLICK;
-                //ESP_LOGI(UI_MAIN_LOG_TAG,"SHORT CLICK");
-                if(!(UI_ELEMENTS_isDisplayOff()||wasFading)){//send the key only, if display is on and was not fading
-                    //ESP_LOGI(UI_MAIN_LOG_TAG, "INQUEUE2: %i",keyMessage.keyEvent);
-                    if(xQueueSend(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(100))!=pdPASS){
-                        ESP_LOGE(UI_MAIN_LOG_TAG,"Lost keystroke.");
+            if(reducedMode){//in reduced mode the display stays on longer
+                uint64_t now=esp_timer_get_time();
+                if((now-lastKeyPressedTime)/1000>45000){
+                    UI_ELEMENTS_displayOff();
+                }
+            }else{
+                if(UI_MAIN_doubleClick>5){
+                    keyMessage.keyEvent=UI_MAIN_KEY_SHORT_CLICK;
+                    //ESP_LOGI(UI_MAIN_LOG_TAG,"SHORT CLICK");
+                    if(!(UI_ELEMENTS_isDisplayOff()||wasFading)){//send the key only, if display is on and was not fading
+                        //ESP_LOGI(UI_MAIN_LOG_TAG, "INQUEUE2: %i",keyMessage.keyEvent);
+                        if(xQueueSend(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(100))!=pdPASS){
+                            ESP_LOGE(UI_MAIN_LOG_TAG,"Lost keystroke.");
+                        }
                     }
+                    if(UI_ELEMENTS_isDisplayOff()||wasFading) UI_ELEMENTS_setBrightness(UI_MAIN_settings.brightness);
+                    wasFading=false;
+                    UI_ELEMENTS_displayOn();
+                    UI_MAIN_doubleClick=0;
+                }else if(UI_MAIN_doubleClick){
+                    UI_MAIN_doubleClick++;
                 }
-                if(UI_ELEMENTS_isDisplayOff()||wasFading) UI_ELEMENTS_setBrightness(UI_MAIN_settings.brightness);
-                wasFading=false;
-                UI_ELEMENTS_displayOn();
-                UI_MAIN_doubleClick=0;
-            }else if(UI_MAIN_doubleClick){
-                UI_MAIN_doubleClick++;
-            }
-            uint64_t now=esp_timer_get_time();
-            if((now-lastKeyPressedTime)/1000>15000){
-                UI_ELEMENTS_displayOff();
-            }else if((now-lastKeyPressedTime)/1000>12000){
-                wasFading=true;
-                uint64_t msUp=(((now-lastKeyPressedTime)/1000)-12000);//0....3000
-                uint64_t step=(msUp*UI_MAIN_settings.brightness)/3000;
-                uint64_t step2=(msUp*16*4)/3000;
-                //ESP_LOGI(UI_MAIN_LOG_TAG,"b: %d  s: %llu  m: %llu  s2: %llu",UI_MAIN_settings.brightness,step,msUp,step2);
-                if(UI_MAIN_settings.brightness-step>0){
-                    UI_ELEMENTS_setBrightness(UI_MAIN_settings.brightness-step);
-                }else{
-                    UI_ELEMENTS_setBrightness(1);
+                uint64_t now=esp_timer_get_time();
+                if((now-lastKeyPressedTime)/1000>15000){
+                    UI_ELEMENTS_displayOff();
+                }else if((now-lastKeyPressedTime)/1000>12000){
+                    wasFading=true;
+                    uint64_t msUp=(((now-lastKeyPressedTime)/1000)-12000);//0....3000
+                    uint64_t step=(msUp*UI_MAIN_settings.brightness)/3000;
+                    uint64_t step2=(msUp*16*4)/3000;
+                    //ESP_LOGI(UI_MAIN_LOG_TAG,"b: %d  s: %llu  m: %llu  s2: %llu",UI_MAIN_settings.brightness,step,msUp,step2);
+                    if(UI_MAIN_settings.brightness-step>0){
+                        UI_ELEMENTS_setBrightness(UI_MAIN_settings.brightness-step);
+                    }else{
+                        UI_ELEMENTS_setBrightness(1);
+                    }
+                    UI_ELEMENTS_disableChars(step2);
                 }
-                UI_ELEMENTS_disableChars(step2);
             }
         }
     }
@@ -308,6 +324,7 @@ char UI_MAIN_pcWriteBuffer[2048];
     bool playOverlayActive=false;
     uint64_t sleepTimeOffTime=0;//the timestamp when the currently setup sleeptime is reached
     uint32_t sleepTimeSetupS=UI_MAIN_DEFAULT_SLEEP_TIME_S;//the setup sleeptime
+    uint64_t reducedModeLastTimestamp=0;
     uint16_t newPlayMinute=0;
     uint64_t newPlayPosition=0;
     uint8_t saveFlag=0;
@@ -379,6 +396,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                             SAVES_cleanOldBookmarks(0);
                         }
                         if(SAVES_loadSettings(&UI_MAIN_settings)==0){
+                            reducedMode=UI_MAIN_settings.reducedMode;
                             if(UI_MAIN_settings.brightness!=0){
                                 UI_ELEMENTS_setBrightness(UI_MAIN_settings.brightness);
                             }else{
@@ -454,26 +472,31 @@ char UI_MAIN_pcWriteBuffer[2048];
                     }
                     break;
             case UI_MAIN_RUN_SM_FOLDER_SELECTION:
-                    if(FF_getNameByID(SD_CARD_MOUNT_POINT,UI_MAIN_sortedBookIDs[selectedFolder-1],&UI_MAIN_selectedFolderName[0],0)!=0){
-                        mainSM=UI_MAIN_RUN_SM_INIT;
-                    }
-                    SCREENS_folderSelect(selectedFolder,UI_MAIN_amountOfBooks,&UI_MAIN_selectedFolderName[0],UI_MAIN_getWakeupTimer(),extraFlags&0x7F);
-                    if((extraFlags&0x80)==0){
-                        UI_MAIN_folderPath[0]=0;
-                        strcpy(&UI_MAIN_folderPath[0],SD_CARD_MOUNT_POINT"/");
-                        strcat(&UI_MAIN_folderPath[0],&UI_MAIN_selectedFolderName[0]);
-                        if(SAVES_existsBookmark(&UI_MAIN_selectedFolderName[0],&UI_MAIN_saveState)==0){
-                            UI_MAIN_searchString=&UI_MAIN_saveState.fileName[0];
-                            UI_MAIN_searchId=&searchId;
-                            extraFlags|=0x81;
-                            if(UI_MAIN_saveState.finished&0x01){
-                                extraFlags|=0x02;
+                    if(selectedFolder==0){
+                        UI_MAIN_cpuNormal();
+                        SCREENS_setupSelect();
+                    }else{
+                        if(FF_getNameByID(SD_CARD_MOUNT_POINT,UI_MAIN_sortedBookIDs[selectedFolder-1],&UI_MAIN_selectedFolderName[0],0)!=0){
+                            mainSM=UI_MAIN_RUN_SM_INIT;
+                        }
+                        if((extraFlags&0x80)==0){
+                            UI_MAIN_folderPath[0]=0;
+                            strcpy(&UI_MAIN_folderPath[0],SD_CARD_MOUNT_POINT"/");
+                            strcat(&UI_MAIN_folderPath[0],&UI_MAIN_selectedFolderName[0]);
+                            if(SAVES_existsBookmark(&UI_MAIN_selectedFolderName[0],&UI_MAIN_saveState)==0){
+                                UI_MAIN_searchString=&UI_MAIN_saveState.fileName[0];
+                                UI_MAIN_searchId=&searchId;
+                                extraFlags|=0x81;
+                                if(UI_MAIN_saveState.finished&0x01){
+                                    extraFlags|=0x02;
+                                }
                             }
                         }
+                        SCREENS_folderSelect(selectedFolder,UI_MAIN_amountOfBooks,&UI_MAIN_selectedFolderName[0],UI_MAIN_getWakeupTimer(),extraFlags&0x7F);
                     }
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(50)) == pdPASS ){//wait for incoming key messages
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
-                            if(selectedFolder>1){
+                            if(selectedFolder>0){
                                 selectedFolder--;
                             }else{
                                 selectedFolder=UI_MAIN_amountOfBooks;
@@ -484,20 +507,19 @@ char UI_MAIN_pcWriteBuffer[2048];
                             if(selectedFolder<UI_MAIN_amountOfBooks){
                                 selectedFolder++;
                             }else{
-                                selectedFolder=1;
+                                selectedFolder=0;
                             }
                             UI_ELEMENTS_textScrollyReset(2,0,12);
                             extraFlags=0;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
-                            xTaskCreate(UI_MAIN_scanSortTaskOneBook, "UI_MAIN_scanSortTaskOneBook", 1024 * 5, NULL,  uxTaskPriorityGet(NULL), NULL);
-                            mainSM=UI_MAIN_RUN_SM_BOOK_SCAN;
-                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
-                            mainSM=UI_MAIN_RUN_SM_SETUP_MENU;
+                            if(selectedFolder==0){
+                                mainSM=UI_MAIN_RUN_SM_SETUP_MENU;
+                            }else{
+                                xTaskCreate(UI_MAIN_scanSortTaskOneBook, "UI_MAIN_scanSortTaskOneBook", 1024 * 5, NULL,  uxTaskPriorityGet(NULL), NULL);
+                                mainSM=UI_MAIN_RUN_SM_BOOK_SCAN;
+                            }
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                             SCREENS_switchingOff(SD_CARD_getSize(),SAVES_getUsedSpaceLevel(),SAVES_cleanOldBookmarks(1));
-                            if(UI_MAIN_isImagePersisted()==0){
-                                UI_MAIN_persistImage();
-                            }
                             vTaskDelay(pdMS_TO_TICKS(2000));
                             return; // returning to main means deep sleep
                         }
@@ -582,8 +604,9 @@ char UI_MAIN_pcWriteBuffer[2048];
                                         }
                                     }
                                 }
-                                if(UI_MAIN_amountOfFiles==1){
-                                    pauseMode=1;//no need for chapter selection if only one track exists
+                                if((UI_MAIN_amountOfFiles==1)||(reducedMode)){
+                                    reducedModeLastTimestamp=esp_timer_get_time();
+                                    pauseMode=1;//no need for chapter selection if only one track exists, also reducedMode switches right to time seek mode
                                     newPlayMinute=currentPlayMinute;//but make sure the blinking adjustable position value is the same as the current position
                                 }
                                 SD_PLAY_setEqualizer(currentEqualizer);
@@ -616,17 +639,36 @@ char UI_MAIN_pcWriteBuffer[2048];
                     if(pauseMode==0){//with chapter selection
                         FORMAT_HELPER_getPlayTimeByExtension(&currentPlaySecond,&currentPlayMinute,&percent,&UI_MAIN_selectedFileName[0],currentPlayPosition,currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,&allPlaySecond,&allPlayMinute,currentPlayChannels);
                         SCREENS_pause0(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],currentPlayMinute,currentPlaySecond,percent,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
+                        if(reducedMode){
+                            if((esp_timer_get_time()-reducedModeLastTimestamp)/1000>10000){//go back to book selection after 10s in chapter selection mode
+                                reducedModeLastTimestamp=esp_timer_get_time();
+                                mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
+                                extraFlags=0;
+                            }
+                        }
                     }else if(pauseMode==1){//with time selection
                         uint64_t dummy;
                         newPlayPosition=FORMAT_HELPER_getFilePosByPlayTimeAndExtension(currentPlaySecond,newPlayMinute,&UI_MAIN_selectedFileName[0],currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,currentPlayChannels);
                         FORMAT_HELPER_getPlayTimeByExtension((uint8_t*)&dummy,(uint16_t*)&dummy,&percent,&UI_MAIN_selectedFileName[0],newPlayPosition,currentPlaySize,currentPlayOffset,currentPlayBlockSize,currentPlayBitrate,&allPlaySecond,&allPlayMinute,currentPlayChannels);
                         SCREENS_pause1(selectedFile,UI_MAIN_amountOfFiles,&UI_MAIN_selectedFolderName[0],newPlayMinute,currentPlaySecond,percent,BATTERY_getCurrentVoltageStable(),UI_MAIN_timeDiffNowS(sleepTimeOffTime));
+                        if(reducedMode){
+                            if((esp_timer_get_time()-reducedModeLastTimestamp)/1000>10000){//switch to chapter selection or book selection after 10s in time selection mode
+                                reducedModeLastTimestamp=esp_timer_get_time();
+                                if(UI_MAIN_amountOfFiles==1){
+                                    mainSM=UI_MAIN_RUN_SM_FOLDER_SELECTION;
+                                    extraFlags=0;
+                                }else{
+                                    pauseMode=0;
+                                }
+                            }
+                        }
                     }
                     if(startUpFlags&UI_MAIN_STARTUPFLAG_RTC){
                         startUpFlags&=~UI_MAIN_STARTUPFLAG_RTC;
                         mainSM=UI_MAIN_RUN_SM_PLAY_INIT;
                     }
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) reducedModeLastTimestamp=esp_timer_get_time();
                         if(pauseMode==0){//with chapter selection
                             if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                                 if(selectedFile>1){
@@ -775,11 +817,13 @@ char UI_MAIN_pcWriteBuffer[2048];
                                             mainSM=UI_MAIN_RUN_SM_PLAY_INIT;//go on if we should repeat
                                         }else{
                                             mainSM=UI_MAIN_RUN_SM_PAUSED;
+                                            if(reducedMode) reducedModeLastTimestamp=esp_timer_get_time();
                                         }
                                     }
                                     oldSelectedFile=selectedFile;
                                 }else{//user pressed pause
                                     mainSM=UI_MAIN_RUN_SM_PAUSED;
+                                    if(reducedMode) reducedModeLastTimestamp=esp_timer_get_time();
                                     saveFlag=1;
                                     if(selectedFile==UI_MAIN_amountOfFiles){//listening to last track of book
                                         if(((uint64_t)100*(uint64_t)UI_MAIN_sdPlayMsgRecv.filePos/(uint64_t)UI_MAIN_sdPlayMsgRecv.fileSize)>95){
@@ -792,6 +836,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                             }else if(UI_MAIN_sdPlayMsgRecv.msgType==SD_PLAY_MSG_TYPE_STOPPED_ERROR){
                                 ESP_LOGI(UI_MAIN_LOG_TAG,"ERROR");
                                 mainSM=UI_MAIN_RUN_SM_PAUSED;
+                                if(reducedMode) reducedModeLastTimestamp=esp_timer_get_time();
                             }else if(UI_MAIN_sdPlayMsgRecv.msgType == SD_PLAY_MSG_TYPE_FILEPOS_STATE){
                                 currentPlayPosition=UI_MAIN_sdPlayMsgRecv.filePos;
                                 currentPlaySize=UI_MAIN_sdPlayMsgRecv.fileSize;
@@ -921,6 +966,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                                     }else{
                                         playOverlayMode=0;
                                     }
+                                    if(reducedMode) playOverlayMode=0;//stay in volume mode in reduced mode
                                     lastPlayOverlayChangedTime=now;playOverlayActive=true;
                                 }else{
                                     UI_MAIN_sdPlayMsgSend.msgType=SD_PLAY_MSG_TYPE_STOP_PLAY;
@@ -947,6 +993,7 @@ char UI_MAIN_pcWriteBuffer[2048];
                     if((now-lastSdPlayMessage)/1000000>2){//2s no message from sd play
                         ESP_LOGE(UI_MAIN_LOG_TAG,"PLAYTIMEOUT");
                         mainSM=UI_MAIN_RUN_SM_PAUSED;
+                        if(reducedMode) reducedModeLastTimestamp=esp_timer_get_time();
                     }
                     if(saveFlag){
                         ESP_LOGI(UI_MAIN_LOG_TAG,"Saving playposition.");
@@ -1069,7 +1116,7 @@ typedef struct UI_MAIN_setupMenuDataStruct{
     int32_t numberOfBookmarks;
 }UI_MAIN_setupMenuData_t;
 UI_MAIN_setupMenuData_t UI_MAIN_setupMenuData;
-
+uint64_t setupMenuReducedModeLastTimestamp=0;
 #define UI_MAIN_SETUP_MENU_SM_INIT 0
 #define UI_MAIN_SETUP_MENU_SUB_SELECTION 5
 #define UI_MAIN_SETUP_MENU_SM_WAKEUP_TIMER 10
@@ -1078,6 +1125,8 @@ UI_MAIN_setupMenuData_t UI_MAIN_setupMenuData;
 #define UI_MAIN_SETUP_MENU_SM_ROT_DIR 25
 #define UI_MAIN_SETUP_MENU_SM_ROT_SPEED 30
 #define UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE 35
+#define UI_MAIN_SETUP_MENU_SM_REDUCED_MODE 40
+#define UI_MAIN_SETUP_MENU_FW_ACCEPT_MODE 45
 #define UI_MAIN_SETUP_MENU_SM_CLEANUP 250
 
 /**
@@ -1091,6 +1140,7 @@ uint8_t UI_MAIN_setupMenu(){
     UI_MAIN_keyMessages_t keyMessage;
     switch(UI_MAIN_setupMenuData.sm){
         case UI_MAIN_SETUP_MENU_SM_INIT:
+                    setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                     UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                     UI_MAIN_setupMenuData.lastMinuteChangedTime=esp_timer_get_time()-5*1000000;
                     memset(&keyMessage,0,sizeof(UI_MAIN_keyMessages_t));
@@ -1098,14 +1148,15 @@ uint8_t UI_MAIN_setupMenu(){
                     break;
         case UI_MAIN_SETUP_MENU_SUB_SELECTION:
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(UI_MAIN_setupMenuData.selectedSub==0){
-                                UI_MAIN_setupMenuData.selectedSub=5;
+                                UI_MAIN_setupMenuData.selectedSub=7;
                             }else{
                                 UI_MAIN_setupMenuData.selectedSub--;
                             }
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
-                            if(UI_MAIN_setupMenuData.selectedSub==5){
+                            if(UI_MAIN_setupMenuData.selectedSub==7){
                                 UI_MAIN_setupMenuData.selectedSub=0;
                             }else{
                                 UI_MAIN_setupMenuData.selectedSub++;
@@ -1129,6 +1180,12 @@ uint8_t UI_MAIN_setupMenu(){
                                         break;
                                 case 5: //bookmark deletion
                                         UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE;
+                                        break;
+                                case 6: //reduced functionality mode
+                                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_REDUCED_MODE;
+                                        break;
+                                case 7: //new fw acceptance mode
+                                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_FW_ACCEPT_MODE;
                                         break;
                             }
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
@@ -1156,13 +1213,25 @@ uint8_t UI_MAIN_setupMenu(){
                         case 5: //bookmark deletion
                                 SCREENS_bookmarkDeletionSetup(UI_MAIN_setupMenuData.numberOfBookmarks,0);
                                 break;
+                        case 6: //reduced functionality mode
+                                SCREENS_reducedModeSetup(UI_MAIN_settings.reducedMode,0);
+                                break;
+                        case 7: //new fw acceptance mode
+                                SCREENS_fwAcceptSetup(UI_MAIN_isImagePersisted(),0);
+                                break;
                     }
-                    UI_ELEMENTS_numberSelect(0,0,UI_MAIN_setupMenuData.selectedSub+1,6,1);
+                    UI_ELEMENTS_numberSelect(0,0,UI_MAIN_setupMenuData.selectedSub+1,8,1);
                     UI_ELEMENTS_update();
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//save settings in reduced mode if nothing was selected after 10s
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_CLEANUP;
+                        }
+                    }
                     break;
         case UI_MAIN_SETUP_MENU_SM_WAKEUP_TIMER:
                     SCREENS_wakeupTimer(UI_MAIN_setupMenuData.wakeupTimeSetupS,1);
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if((now-UI_MAIN_setupMenuData.lastMinuteChangedTime)>50000){
                                 if(UI_MAIN_setupMenuData.wakeupTimeSetupS>60){
@@ -1198,10 +1267,18 @@ uint8_t UI_MAIN_setupMenu(){
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }
                     }
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//go back after 10s no input in reduced mode
+                            setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                            UI_MAIN_setWakeupTimer(0);
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
                     break;
         case UI_MAIN_SETUP_MENU_SM_SCREEN_SETUP:
                     SCREENS_screenSetup(UI_MAIN_settings.screenRotation,1);
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(UI_MAIN_settings.screenRotation){
                                 UI_MAIN_settings.screenRotation=0;
@@ -1224,10 +1301,17 @@ uint8_t UI_MAIN_setupMenu(){
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }
                     }
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//go back after 10s no input in reduced mode
+                            setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
                     break;
         case UI_MAIN_SETUP_MENU_SM_SCREEN_BRIGHTNESS:
                     SCREENS_screenBrightnessSetup(UI_MAIN_settings.brightness-1,1);
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(UI_MAIN_settings.brightness>5){
                                 UI_MAIN_settings.brightness-=5;
@@ -1250,10 +1334,17 @@ uint8_t UI_MAIN_setupMenu(){
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }
                     }
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//go back after 10s no input in reduced mode
+                            setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
                     break;
         case UI_MAIN_SETUP_MENU_SM_ROT_DIR:
                     SCREENS_rotDirSetup(UI_MAIN_settings.rotaryEncoderDirection,1);
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(UI_MAIN_settings.rotaryEncoderDirection){
                                 UI_MAIN_settings.rotaryEncoderDirection=0;
@@ -1273,6 +1364,12 @@ uint8_t UI_MAIN_setupMenu(){
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//go back after 10s no input in reduced mode
+                            setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }
                     }
@@ -1280,6 +1377,7 @@ uint8_t UI_MAIN_setupMenu(){
         case UI_MAIN_SETUP_MENU_SM_ROT_SPEED:
                     SCREENS_rotSpeedSetup(UI_MAIN_settings.rotaryEncoderSpeed,1);
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                             if(UI_MAIN_settings.rotaryEncoderSpeed){
                                 UI_MAIN_settings.rotaryEncoderSpeed=0;
@@ -1302,10 +1400,17 @@ uint8_t UI_MAIN_setupMenu(){
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }
                     }
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//go back after 10s no input in reduced mode
+                            setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
                     break;
         case UI_MAIN_SETUP_MENU_SM_BOOKMARK_DELETE:
                     SCREENS_bookmarkDeletionSetup(UI_MAIN_setupMenuData.numberOfBookmarks,1);
                     while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
                         if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
                         }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
@@ -1318,11 +1423,77 @@ uint8_t UI_MAIN_setupMenu(){
                             UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
                         }
                     }
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//go back after 10s no input in reduced mode
+                            setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
                     break;
         case UI_MAIN_SETUP_MENU_SM_CLEANUP:
                     UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SM_INIT;
                     SAVES_saveSettings(&UI_MAIN_settings);
+                    reducedMode=UI_MAIN_settings.reducedMode;
                     return 1;
+                    break;
+
+        case UI_MAIN_SETUP_MENU_SM_REDUCED_MODE:
+                    SCREENS_reducedModeSetup(UI_MAIN_settings.reducedMode,1);
+                    while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                        if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                        if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            if(UI_MAIN_settings.reducedMode==0){
+                                UI_MAIN_settings.reducedMode=1;
+                            }else{
+                                UI_MAIN_settings.reducedMode=0;
+                            }
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            if(UI_MAIN_settings.reducedMode==1){
+                                UI_MAIN_settings.reducedMode=0;
+                            }else{
+                                UI_MAIN_settings.reducedMode=1;
+                            }
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//go back after 10s no input in reduced mode
+                            setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
+                    break;
+
+        case UI_MAIN_SETUP_MENU_FW_ACCEPT_MODE:
+                    if(UI_MAIN_isImagePersisted()){
+                        UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                    }else{
+                        SCREENS_fwAcceptSetup(UI_MAIN_isImagePersisted(),1);
+                        while(xQueueReceive(UI_MAIN_keyQueue,&keyMessage,pdMS_TO_TICKS(10)) == pdPASS ){//wait for incoming key messages
+                            if(reducedMode) setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                            if(keyMessage.keyEvent==UI_MAIN_KEY_MINUS){
+                            }else if(keyMessage.keyEvent==UI_MAIN_KEY_PLUS){
+                            }else if(keyMessage.keyEvent==UI_MAIN_KEY_SHORT_CLICK){
+                                UI_MAIN_persistImage();
+                                UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                            }else if(keyMessage.keyEvent==UI_MAIN_KEY_LONG_CLICK){
+                                UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                            }else if(keyMessage.keyEvent==UI_MAIN_KEY_DOUBLE_CLICK){
+                                UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                            }
+                        }
+                    }
+                    if(reducedMode){
+                        if((esp_timer_get_time()-setupMenuReducedModeLastTimestamp)/1000>10000){//go back after 10s no input in reduced mode
+                            setupMenuReducedModeLastTimestamp=esp_timer_get_time();
+                            UI_MAIN_setupMenuData.sm=UI_MAIN_SETUP_MENU_SUB_SELECTION;
+                        }
+                    }
                     break;
     }
     return 0;
